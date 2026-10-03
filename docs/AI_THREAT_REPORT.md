@@ -5,7 +5,7 @@ The raw dataset is never written to disk; rerunning the command reproduces these
 
 - Model: multinomial logistic regression (softmax), 15 features → 6 classes, pure TypeScript, no dependencies.
 - Data: 14874 labeled track snapshots from 230 headless simulations (10 scripted + 220 generated draws).
-- Split: **scenario-level** 70/10/20 by scenario-ID hash — validation consists entirely of track snapshots from simulated scenarios that are absent from the training set. This measures **generalization to unseen simulated scenarios**, not real-world generalization.
+- Split: **scenario-level** 70/10/20 using deterministic round-robin assignment over sorted scenario IDs — validation consists entirely of track snapshots from simulated scenarios that are absent from the training set. This measures **generalization to unseen simulated scenarios**, not real-world generalization.
 - Labels: ground-truth allegiance/kind, except tracks younger than 6 s or with fewer than 2 fresh sensor readings are labeled `unknown_uav` (insufficient evidence must mean "unknown").
 - Training: seeded full-batch gradient descent, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, inverse-frequency class weights (capped at 6), 400 epochs.
 - Dataset generation took 2.8 s on a laptop CPU.
@@ -19,7 +19,7 @@ The raw dataset is never written to disk; rerunning the command reproduces these
 | Softmax | 70.3% | 0.622 | ~1.9 KB |
 | Softmax + interactions | 71.0% | 0.629 | ~2.5 KB |
 
-An MLP was deliberately not built: the decision rule keeps the simplest model with sufficient measured performance, and a neural net would cost explainability, size, and determinism guarantees for no demonstrated need.
+An MLP was not built or benchmarked. The project deliberately retained the simpler softmax model because it already satisfied the required determinism, CPU-only/offline deployment, tiny footprint, and exact feature-attribution constraints, while the interaction benchmark did not meet the predefined improvement threshold.
 Note on the heuristic: it re-implements parts of the labeling rule itself (notably the insufficient-evidence → unknown mapping), so its raw accuracy is inflated by construction. Macro F1 — which punishes its minority-class failures — is the honest comparator, and the trained model wins it while additionally providing calibrated probabilities and exact per-feature evidence the rule list cannot.
 
 ## Metrics (held-out TEST scenarios, n=2973)
@@ -52,11 +52,11 @@ Note on the heuristic: it re-implements parts of the labeling rule itself (notab
 
 ## Stress-test subsets (test split, from scenario/environment metadata)
 
-- **NORMAL**: 68.1% (n=326)
 - **NIGHT**: 70.2% (n=1770)
-- **DEGRADED SENSORS**: 70.5% (n=681)
-- **HIGH SENSOR CONFLICT**: 71.8% (n=117)
-- **HIGH AMBIGUITY**: 75.9% (n=79)
+- **DEGRADED SENSORS**: 70.1% (n=2069)
+- **HIGH SENSOR CONFLICT**: 65.9% (n=908)
+- **HIGH AMBIGUITY**: 70.3% (n=2257)
+- **NORMAL**: 68.1% (n=326)
 
 ## Scenario-level evaluation (test split, 46 scenarios)
 
@@ -92,4 +92,4 @@ Note on the heuristic: it re-implements parts of the labeling rule itself (notab
 
 - Seed 482913 · scenarios 230 (train 161 / calib 23 / test 46) · snapshots train 10032 / calib 1869 / test 2973
 - Config: epochs 400, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, class-weight cap 6, snapshot ages 1/3/4/6/10/20/35/60/90/150s
-- Feature version 2 · model version 2 · git commit 283360b61f055bbde0ef3e0c7547783f0f0d9279
+- Feature version 2 · model version 2 · git commit b76e80bddd9af54126b85eacf9cb6de3608c2d8b

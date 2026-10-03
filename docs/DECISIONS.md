@@ -44,7 +44,7 @@ The AI brief sketches target difficulty as 3.2/5. The scenario schema defines in
 
 ## 011 - No MLP: interactions benchmark rejected, neural net never built
 
-Softmax plus five documented interaction features was benchmarked on the identical scenario-level split and failed the pre-registered bar (macro-F1 gain below 0.02), so the plain 15-feature model shipped. An MLP was not built at all: per the decision rule it would have cost exact evidence attribution, model size, and determinism confidence for no demonstrated need. The comparison table in the training report shows majority, heuristic, and both softmax variants so a judge can see the whole ladder.
+Softmax plus five documented interaction features was benchmarked on the identical scenario-level split and failed the pre-registered bar (macro-F1 gain below 0.02), so the plain 15-feature model shipped. An MLP was not built or benchmarked. The project deliberately retained the simpler softmax model because it already satisfied the required determinism, CPU-only/offline deployment, tiny footprint, and exact feature-attribution constraints, while the interaction benchmark did not meet the predefined improvement threshold. The comparison table in the training report shows majority, heuristic, and both softmax variants so a judge can see the whole ladder.
 
 ## 012 - Scenario-level validation split with a dedicated calibration split
 

@@ -21,11 +21,13 @@ One message per slide. Speaker notes in italics.
 - The one-line hook: *"We train judgment under doubt, not reflexes — confidence is evidence quality, not permission to act."*
 
 ## Slide 4 — Technical approach (be brutally honest)
-- **The loop (draw this):** SIMULATED SENSOR DATA → 15-feature trained model → threat hypothesis + model confidence + evidence → HUMAN DECIDES → deterministic scoring → AAR/replay → Bayesian skill model → adaptive challenge → procedural generation → (loop).
-- **Where is the AI? (three answers, in this order):** (1) a tiny *trained* softmax threat model — 15 features → 6 classes, learned from 14,874 sim-generated snapshots, scenario-level held-out validation, macro F1 0.60 vs 0.56 heuristic vs 0.10 majority; (2) a Bayesian skill model with persisted skill state and pattern detection; (3) challenge-profile scenario intelligence with a mandatory fairness gate.
+- **The loop (draw this):** SIMULATED SENSOR DATA → 15-feature trained model → threat hypothesis + model confidence + evidence → HUMAN DECIDES → deterministic scoring → AAR/replay → Bayesian skill model → adaptive challenge → procedural generation → ↺ (loop).
+- **Four kinds of "AI" — name which is which:** TRAINED ML = threat classifier only · STATISTICAL ADAPTATION = Bayesian skill model · RULE-BASED INTELLIGENCE = pattern detection, challenge mapping, adversary emphasis · DETERMINISTIC SYSTEMS = simulation, scoring, replay, fairness gate. Never describe the rule-based or deterministic parts as trained models.
+- **Where is the AI? (three answers, in this order):** (1) a tiny *trained* softmax threat model — 15 features → 6 classes, learned from 14,874 sim-generated snapshots, scenario-level held-out validation, macro F1 0.62 vs 0.54 heuristic vs 0.10 majority; (2) a Bayesian skill model with persisted skill state and pattern detection; (3) challenge-profile scenario intelligence with a mandatory fairness gate.
 - **What we did NOT build:** no LLMs, no giant models, no ONNX runtime (a WASM black box would cost us exact evidence attribution), no real weapon data — everything is fictional gameplay parameters. Say this out loud; judges punish caught AI theater, never honesty.
-- **AI metrics block (copy from `docs/AI_THREAT_REPORT.md`, never from memory):** 15 features → 6 classes · 14,874 synthetic observations · 230 scenarios · scenario-level held-out validation · accuracy 69.3% · macro F1 0.60 · balanced accuracy 0.68 · ECE 0.109→0.046 · model ~2.3 KB · inference <1 ms CPU · offline.
-- Stack (checkable names): React + TypeScript + Canvas, Node 24, SQLite (built-in), Vitest + Playwright. 75 unit tests + browser E2E green.
+- **AI metrics block (copy from `docs/AI_METRICS.json`, never from memory):** 15 features → 6 classes · 14,874 synthetic observations · 230 scenarios · scenario-level held-out validation · accuracy 70.3% · macro F1 0.62 · balanced accuracy 0.69 · ECE 0.109→0.046 · model ~2.3 KB · inference <1 ms CPU · offline.
+- **AI DOES:** interpret imperfect sensor evidence · estimate a threat hypothesis · expose uncertainty · identify training weaknesses · recommend the next exercise. **AI DOES NOT:** control scoring · override ROE · see hidden ground truth during inference · require cloud inference · require a GPU · make the final operational decision.
+- Stack (checkable names): React + TypeScript + Canvas, Node 24, SQLite (built-in), Vitest + Playwright. 82 unit tests + browser E2E green.
 - *Key line: **AI recommends. Deterministic simulation verifies. Human decides.***
 
 ## Slide 5 — Feasibility, viability, impact

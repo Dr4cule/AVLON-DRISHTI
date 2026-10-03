@@ -149,7 +149,7 @@ function softmax(logits: number[]): number[] {
   return exps.map(e => e / total);
 }
 
-interface LinearModel {
+export interface LinearModel {
   W: number[][];
   b: number[];
   expand?: (x: number[]) => number[];
@@ -210,8 +210,8 @@ function confusionFor(model: LinearModel, rows: Row[]): number[][] {
   return matrix;
 }
 
-/** Baseline A: always predict the most frequent training class. */
-function majorityBaseline(train: Row[], test: Row[]): { accuracy: number; macroF1: number } {
+/** Baseline A: always predict the most frequent training class. Exported for tests. */
+export function majorityBaseline(train: Row[], test: Row[]): { accuracy: number; macroF1: number } {
   const counts = new Array<number>(THREAT_CLASSES.length).fill(0);
   for (const r of train) counts[r.y]++;
   const majority = counts.indexOf(Math.max(...counts));
@@ -275,8 +275,8 @@ function nll(model: LinearModel, rows: Row[], temperature: number): number {
   return total / Math.max(1, rows.length);
 }
 
-/** Deterministic temperature fit on the CALIBRATION split only. */
-function fitTemperature(model: LinearModel, calib: Row[]): number {
+/** Deterministic temperature fit on the CALIBRATION split only. Exported for tests. */
+export function fitTemperature(model: LinearModel, calib: Row[]): number {
   let bestT = 1;
   let bestNll = nll(model, calib, 1);
   for (let i = 0; i <= 120; i++) {
@@ -305,15 +305,33 @@ function eceOn(model: LinearModel, rows: Row[], temperature: number): number {
   return expectedCalibrationError(conf, correct).ece;
 }
 
-type StressCategory = 'NORMAL' | 'NIGHT' | 'DEGRADED SENSORS' | 'HIGH SENSOR CONFLICT' | 'HIGH AMBIGUITY';
+export type StressName = 'NORMAL' | 'NIGHT' | 'DEGRADED SENSORS' | 'HIGH SENSOR CONFLICT' | 'HIGH AMBIGUITY';
 
-export function stressCategory(row: Row): StressCategory {
-  if (row.tod === 'night') return 'NIGHT';
-  if (row.em !== 'clean') return 'DEGRADED SENSORS';
-  if (row.x[F('sensor_agreement')] < 0.5) return 'HIGH SENSOR CONFLICT';
-  if (row.distractorsTag >= 3) return 'HIGH AMBIGUITY';
-  return 'NORMAL';
+/**
+ * Independent stress conditions — a single sample may belong to several
+ * subsets (e.g. night + degraded). NORMAL means none of the stress
+ * conditions apply. Overlapping membership is reported per-subset, so no
+ * difficult case silently disappears from another category.
+ */
+export const STRESS_FILTERS: Record<Exclude<StressName, 'NORMAL'>, (row: Row) => boolean> = {
+  NIGHT: row => row.tod === 'night',
+  'DEGRADED SENSORS': row => row.em !== 'clean',
+  'HIGH SENSOR CONFLICT': row => row.x[F('sensor_agreement')] < 0.5,
+  'HIGH AMBIGUITY': row => row.distractorsTag >= 3,
+};
+
+export function stressSubsets(rows: Row[]): { name: StressName; subset: Row[] }[] {
+  const stressed = (Object.keys(STRESS_FILTERS) as (keyof typeof STRESS_FILTERS)[]).map(name => ({
+    name: name as StressName,
+    subset: rows.filter(STRESS_FILTERS[name]),
+  }));
+  return [
+    ...stressed,
+    { name: 'NORMAL' as StressName, subset: rows.filter(r => !stressed.some(s => s.subset.includes(r))) },
+  ];
 }
+
+
 
 function gitCommit(): string {
   try {
@@ -354,18 +372,20 @@ function main() {
   const richTotals = confusionTotals(richMatrix);
   const richMacroF1 = macroAverage(richTotals.perClass, 'f1');
 
-  // --- Calibration (fit on CALIB only, evaluated on TEST only) ---
-  const eceBefore = eceOn(base, test, 1);
-  const temperature = fitTemperature(base, calib);
-  const eceAfter = eceOn(base, test, temperature);
-  const calibrated = eceAfter < eceBefore - 0.005;
-  const finalTemperature = calibrated ? temperature : 1;
-
-  // --- Winner selection: simplest sufficient model ---
+  // --- Winner selection first: simplest sufficient model ---
   const useInteractions = richMacroF1 >= baseMacroF1 + 0.02;
   const winner = useInteractions ? rich : base;
   const winnerTotals = useInteractions ? richTotals : baseTotals;
   const winnerMacroF1 = useInteractions ? richMacroF1 : baseMacroF1;
+
+  // --- Calibration AFTER winner selection, fit on CALIB only, evaluated on TEST only ---
+  // Temperature belongs to the shipped model; fitting it on a model we discard
+  // would silently miscalibrate whatever we actually ship.
+  const eceBefore = eceOn(winner, test, 1);
+  const temperature = fitTemperature(winner, calib);
+  const eceAfter = eceOn(winner, test, temperature);
+  const calibrated = eceAfter < eceBefore - 0.005;
+  const finalTemperature = calibrated ? temperature : 1;
 
   // --- Slice evaluations on the TEST split ---
   const established = test.filter(r => r.ageSec >= 6 && r.fresh >= 2);
@@ -377,9 +397,7 @@ function main() {
   const predicted = test.map(r => predictRow(winner, r.x).cls);
   const binary = hostileBinaryMetrics(truth, predicted);
 
-  const stressCats: StressCategory[] = ['NORMAL', 'NIGHT', 'DEGRADED SENSORS', 'HIGH SENSOR CONFLICT', 'HIGH AMBIGUITY'];
-  const stress = stressCats.map(name => {
-    const subset = test.filter(r => stressCategory(r) === name);
+  const stress = stressSubsets(test).map(({ name, subset }) => {
     const m = subset.length === 0 ? 0 : subset.filter(r => predictRow(winner, r.x).cls === r.y).length / subset.length;
     return { name, n: subset.length, accuracy: Math.round(m * 10000) / 10000 };
   });
@@ -429,6 +447,44 @@ function main() {
   };
   writeFileSync(join(outDir, 'weights.json'), JSON.stringify(weights, null, 2) + '\n');
 
+  // --- Canonical machine-readable metrics: the single source of truth that
+  // presentation docs copy from (never the reverse). Same measured values as
+  // the report below, generated in the same run.
+  const round4 = (v: number): number => Math.round(v * 10000) / 10000;
+  const metricsArtifact = {
+    model: useInteractions ? 'softmax+interactions' : 'softmax',
+    featureCount: FEATURE_NAMES.length + (useInteractions ? INTERACTIONS.length : 0),
+    classCount: THREAT_CLASSES.length,
+    samples: rows.length,
+    scenarios,
+    trainScenarios: weights.meta.trainScenarios,
+    calibrationScenarios: weights.meta.calibScenarios,
+    testScenarios: weights.meta.testScenarios,
+    trainSamples: train.length,
+    calibrationSamples: calib.length,
+    testSamples: test.length,
+    testAccuracy: round4(winnerTotals.accuracy),
+    macroPrecision: round4(macroAverage(winnerTotals.perClass, 'precision')),
+    macroRecall: round4(macroAverage(winnerTotals.perClass, 'recall')),
+    macroF1: round4(winnerMacroF1),
+    balancedAccuracy: round4(balancedAccuracy(winnerTotals.perClass)),
+    eceBefore: round4(eceBefore),
+    eceAfter: round4(eceAfter),
+    temperature: finalTemperature,
+    interactionsSelected: useInteractions,
+    majorityAccuracy: round4(majority.accuracy),
+    majorityMacroF1: round4(majority.macroF1),
+    heuristicAccuracy: round4(heuristic.accuracy),
+    heuristicMacroF1: round4(heuristic.macroF1),
+    softmaxAccuracy: round4(baseTotals.accuracy),
+    softmaxMacroF1: round4(baseMacroF1),
+    interactionAccuracy: round4(richTotals.accuracy),
+    interactionMacroF1: round4(richMacroF1),
+    featureVersion: FEATURE_VERSION,
+    modelVersion: MODEL_VERSION,
+  };
+  writeFileSync(join(ROOT, 'docs', 'AI_METRICS.json'), JSON.stringify(metricsArtifact, null, 2) + '\n');
+
   const perClassMd = winnerTotals.perClass
     .map(p => `- **${p.name}**: n=${p.samples}, precision=${p.precision}, recall=${p.recall}, F1=${p.f1}`)
     .join('\n');
@@ -456,7 +512,7 @@ The raw dataset is never written to disk; rerunning the command reproduces these
 
 - Model: multinomial logistic regression (softmax), ${FEATURE_NAMES.length} features → ${THREAT_CLASSES.length} classes${useInteractions ? ' + selected interaction terms' : ''}, pure TypeScript, no dependencies.
 - Data: ${rows.length} labeled track snapshots from ${scenarios} headless simulations (10 scripted + ${N_GEN} generated draws).
-- Split: **scenario-level** 70/10/20 by scenario-ID hash — validation consists entirely of track snapshots from simulated scenarios that are absent from the training set. This measures **generalization to unseen simulated scenarios**, not real-world generalization.
+- Split: **scenario-level** 70/10/20 using deterministic round-robin assignment over sorted scenario IDs — validation consists entirely of track snapshots from simulated scenarios that are absent from the training set. This measures **generalization to unseen simulated scenarios**, not real-world generalization.
 - Labels: ground-truth allegiance/kind, except tracks younger than 6 s or with fewer than 2 fresh sensor readings are labeled \`unknown_uav\` (insufficient evidence must mean "unknown").
 - Training: seeded full-batch gradient descent, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, inverse-frequency class weights (capped at 6), ${EPOCHS} epochs.
 - Dataset generation took ${(genMs / 1000).toFixed(1)} s on a laptop CPU.
@@ -465,7 +521,7 @@ The raw dataset is never written to disk; rerunning the command reproduces these
 
 ${modelTable}
 
-An MLP was deliberately not built: the decision rule keeps the simplest model with sufficient measured performance, and a neural net would cost explainability, size, and determinism guarantees for no demonstrated need.
+An MLP was not built or benchmarked. The project deliberately retained the simpler softmax model because it already satisfied the required determinism, CPU-only/offline deployment, tiny footprint, and exact feature-attribution constraints, while the interaction benchmark did not meet the predefined improvement threshold.
 Note on the heuristic: it re-implements parts of the labeling rule itself (notably the insufficient-evidence → unknown mapping), so its raw accuracy is inflated by construction. Macro F1 — which punishes its minority-class failures — is the honest comparator, and the trained model wins it while additionally providing calibrated probabilities and exact per-feature evidence the rule list cannot.
 
 ## Metrics (held-out TEST scenarios, n=${test.length})

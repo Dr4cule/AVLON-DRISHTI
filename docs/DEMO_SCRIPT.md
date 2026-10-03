@@ -6,7 +6,7 @@
 1:10 Make the key mistake: classify the bird flock hostile and attempt an effect. Show rejection/explanation; then do the correct warn-then-legal path on a real hostile.
 1:50 End & debrief. Score ring + 5 metrics. Open **AI PERFORMANCE ANALYSIS**: read the detected opportunity, WHAT THE MODEL SAW THEN, and the lesson. Then open decision-tree trace for the mistaken contact; click the critical mistake → timeline jumps to exact tick.
 2:20 Toggle Trainee view → Ground truth at same tick. “We saw an ambiguous return; truth was benign.” Show event hash verified.
-2:50 Adaptive intelligence: weakest dimension + uncertainty + detected patterns + scenario modifiers + **skill movement from real history** (measured, never staged) → Launch recommended L/focus exercise. Shows no rote learning.
+2:50 Adaptive intelligence: weakest dimension + uncertainty + detected patterns + scenario modifiers + **skill movement from real history** (measured, never staged) → Launch recommended L/focus exercise — say aloud that every generated exercise passes the baseline-feasibility gate, so the AI can only choose among fair fights. Shows no rote learning.
 3:20 Unit readiness (instructor): average, failure clusters, roster, CSV/print. Note synthetic labels, no readiness claim.
 3:50 Close: seeded replayable scenarios, uncertainty-aware training, ROE scoring, adaptive difficulty, fully offline. All fictional gameplay models.
 

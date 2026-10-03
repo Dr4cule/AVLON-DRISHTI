@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { heuristicPredict, splitRows, stressCategory, type Row } from '../sim-core/threat/train';
+import { fitTemperature, heuristicPredict, majorityBaseline, splitRows, stressSubsets, type LinearModel, type Row } from '../sim-core/threat/train';
 import { Simulation, replay } from '../sim-core/engine';
 import { SCRIPTED_SCENARIOS } from '../sim-core/catalog';
 import { extractFeatures, FEATURE_NAMES, labelFor, THREAT_CLASSES } from '../sim-core/threat/features';
@@ -17,7 +17,7 @@ function liveTrack(ticks: number): { sim: Simulation; track: Track; entityId: st
 }
 
 describe('threat feature extraction', () => {
-  it('produces 14 finite features in [0,1]-ish range from trainee-visible data only', () => {
+  it('produces 15 finite features in [0,1]-ish range from trainee-visible data only', () => {
     const { sim, track } = liveTrack(120);
     const x = extractFeatures(track, scenario, sim.state.tick);
     expect(x).toHaveLength(FEATURE_NAMES.length);
@@ -130,19 +130,55 @@ describe('threat softmax model', () => {
     expect(first.train.length).toBeGreaterThan(first.calib.length);
     expect(first.test.length).toBeGreaterThan(0);
   });
-  it('places every sample in exactly one stress category', () => {
-    const { sim } = liveTrack(160);
-    void sim;
+  it('evaluates stress conditions independently with NORMAL as the complement', () => {
     const base: Row = {
       x: new Array(FEATURE_NAMES.length).fill(0.5), y: 0, s: 'x', ageSec: 30,
       fresh: 3, terrain: 'rural', tod: 'day', weather: 'clear', em: 'clean',
       difficulty: 2, distractorsTag: 0,
     };
-    expect(stressCategory(base)).toBe('NORMAL');
-    expect(stressCategory({ ...base, tod: 'night' })).toBe('NIGHT');
-    expect(stressCategory({ ...base, em: 'jammed' })).toBe('DEGRADED SENSORS');
-    expect(stressCategory({ ...base, x: base.x.map((v, i) => (i === 10 ? 0.1 : v)) })).toBe('HIGH SENSOR CONFLICT');
-    expect(stressCategory({ ...base, distractorsTag: 4 })).toBe('HIGH AMBIGUITY');
+    // A night + degraded + conflicting + ambiguous sample belongs to every
+    // stress subset at once — it must not silently disappear from any of them.
+    const brutal: Row = {
+      ...base, tod: 'night', em: 'jammed', distractorsTag: 4,
+      x: base.x.map((v, i) => (i === 10 ? 0.1 : v)),
+    };
+    const subs = new Map(stressSubsets([base, brutal]).map(s => [s.name, s.subset]));
+    expect(subs.get('NORMAL')!.length).toBe(1);
+    expect(subs.get('NIGHT')!.length).toBe(1);
+    expect(subs.get('DEGRADED SENSORS')!.length).toBe(1);
+    expect(subs.get('HIGH SENSOR CONFLICT')!.length).toBe(1);
+    expect(subs.get('HIGH AMBIGUITY')!.length).toBe(1);
+    expect(subs.get('NIGHT')![0]).toBe(brutal);
+    // A clean sample is NORMAL and nothing else.
+    for (const [name, subset] of subs) {
+      if (name === 'NORMAL') continue;
+      expect(subset.includes(base)).toBe(false);
+    }
+  });
+  it('fits temperature deterministically, cooling overconfidence and leaving calm data near 1', () => {
+    const model: LinearModel = { W: [[2, 0], [0, 2]], b: [0, 0] };
+    const mkRow = (x: number[], y: number): Row => ({
+      x, y, s: 'toy', ageSec: 30, fresh: 3, terrain: 'rural', tod: 'day',
+      weather: 'clear', em: 'clean', difficulty: 2, distractorsTag: 0,
+    });
+    // Confidently wrong predictions should be cooled (T > 1 flattens them).
+    const wrong = [mkRow([1, 0], 1), mkRow([0, 1], 0), mkRow([1, 0], 1), mkRow([0, 1], 0)];
+    const cooled = fitTemperature(model, wrong);
+    expect(cooled).toBeGreaterThan(1);
+    expect(fitTemperature(model, wrong)).toBe(cooled);
+    // Empty calibration data cannot move the temperature off the default.
+    expect(fitTemperature(model, [])).toBe(1);
+  });
+  it('computes the majority baseline from training frequencies', () => {
+    const mkRow = (y: number): Row => ({
+      x: new Array(FEATURE_NAMES.length).fill(0.1), y, s: 'toy', ageSec: 30,
+      fresh: 3, terrain: 'rural', tod: 'day', weather: 'clear', em: 'clean',
+      difficulty: 2, distractorsTag: 0,
+    });
+    // Train is 3x class 0, 1x class 1 → majority predicts 0; test is half class 0.
+    const train = [mkRow(0), mkRow(0), mkRow(0), mkRow(1)];
+    const test = [mkRow(0), mkRow(1)];
+    expect(majorityBaseline(train, test)).toEqual({ accuracy: 0.5, macroF1: expect.any(Number) });
   });
   it('heuristic baseline emits valid classes deterministically', () => {
     const zeros = new Array(FEATURE_NAMES.length).fill(0);

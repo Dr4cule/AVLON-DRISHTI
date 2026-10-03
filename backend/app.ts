@@ -18,8 +18,16 @@ export function createApp(store: Store, webRoot?: string) {
     if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
     const origin = req.headers.origin;
     if (origin) {
-      try { if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname)) throw new Error(); }
-      catch { next(new HttpError(403, 'Only the local training interface may use this API.')); return; }
+      try {
+        const stripBrackets = (h: string) => h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h;
+        const originHost = stripBrackets(new URL(origin).hostname.toLowerCase());
+        let reqHost = String(req.headers.host ?? '').toLowerCase();
+        if (reqHost.startsWith('[')) reqHost = stripBrackets(reqHost.split(']:')[0] + ']');
+        else reqHost = reqHost.split(':')[0];
+        const local = new Set(['127.0.0.1', 'localhost', '::1']);
+        if (!local.has(originHost) && originHost !== reqHost) throw new Error();
+      }
+      catch { next(new HttpError(403, 'Only the training interface served by this station may use this API.')); return; }
     }
     next();
   });

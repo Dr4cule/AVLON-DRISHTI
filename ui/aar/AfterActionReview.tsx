@@ -7,6 +7,7 @@ import { RadarMap } from '../tactical/RadarMap';
 import { AiAnalysis } from './AiAnalysis';
 import { ConfusionMatrix, ScoreRing, TrendChart } from '../components/Charts';
 import { downloadJson, exportSessions } from '../lib/exports';
+import { playCue } from '../lib/sound';
 
 interface Props { sessions: SessionRecord[]; users: User[]; user: User; selectedId: string | null; onSelect: (id: string) => void; onPractice: () => void }
 const METRIC_NAMES = { detection: 'Detection', classification: 'Classification', decision: 'Decision quality', outcome: 'Outcome', reasoning: 'Reasoning' };
@@ -31,6 +32,13 @@ export function AfterActionReview({ sessions, users, user, selectedId, onSelect,
   }, [playing, session?.id, speed]);
   const full = useMemo(() => session ? replay(session.scenario, session.actions, session.end_tick) : null, [session?.id]);
   const frame = useMemo(() => session ? replay(session.scenario, session.actions.filter(a => a.tick <= cursor), Math.min(cursor, session.end_tick), false) : null, [session?.id, cursor]);
+  // A checksum mismatch is a rare integrity failure shown as a small tag —
+  // easy to miss, so it gets the only sound in the review flow. Verified
+  // replays stay silent.
+  useEffect(() => {
+    if (!session || !full) return;
+    if (full.eventHash() !== session.report.event_hash) playCue('integrity');
+  }, [session?.id]);
   if (!session || !frame || !full) return <><div className="page-heading"><div><div className="eyebrow">LEARNING STARTS WITH REFLECTION</div><h1>After-action review<span className="accent">.</span></h1></div></div><div className="panel empty-inline large-empty"><History size={35} /><p>Your first decision story starts here.</p><span>Complete an exercise to inspect its score, evidence, replay, and next learning opportunity.</span><button className="button primary" onClick={onPractice}>Start an exercise <ArrowRight size={14} /></button></div></>;
   const { report } = session;
   const operator = users.find(u => u.id === session.user_id)?.name ?? session.user_id;

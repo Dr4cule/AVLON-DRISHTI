@@ -4,6 +4,7 @@ import { SCRIPTED_SCENARIOS } from '../../sim-core/catalog';
 import { scoreSimulation } from '../../sim-core/scoring';
 import { ENGINE_VERSION, type Action, type RunJournal, type Scenario, type SessionRecord, type User } from '../../sim-core/types';
 import { api, type Bootstrap } from './api';
+import { suspendAudio, unlockAudio } from './sound';
 
 const journalKey = (userId: string) => `drishti.journal.v1.${userId}`;
 export function useTraining(onCompleted: (record: SessionRecord) => void) {
@@ -72,7 +73,7 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     return () => clearInterval(timer);
   }, [running, speed, checkpoint, persist]);
   useEffect(() => {
-    const save = () => { persist(); if (document.hidden) setRunning(false); };
+    const save = () => { persist(); if (document.hidden) { setRunning(false); suspendAudio(); } };
     document.addEventListener('visibilitychange', save); window.addEventListener('pagehide', persist);
     return () => { document.removeEventListener('visibilitychange', save); window.removeEventListener('pagehide', persist); };
   }, [persist]);
@@ -105,6 +106,7 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     refresh();
   }, []);
   const start = useCallback(async (scenario: Scenario, mode: 'training' | 'assessment'): Promise<boolean> => {
+    unlockAudio();
     if (journal.current) { const saved = await finish(); if (!saved) return false; }
     setBusy(true);
     try {
@@ -115,12 +117,14 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     finally { setBusy(false); }
   }, [finish, persist]);
   const toggle = useCallback(() => {
+    unlockAudio();
     if (!journal.current) { void start(simRef.current.scenario, 'training'); return; }
     if (simRef.current.state.ended) { void finish(); return; }
     setRecovered(false); setRunning(v => !v);
   }, [start, finish]);
   const act = useCallback((input: Omit<Action, 'tick'>) => {
     if (!journal.current || simRef.current.state.ended) return;
+    unlockAudio();
     const result = simRef.current.dispatch({ ...input, tick: simRef.current.state.tick });
     setMessage(result.message); persist(); refresh();
   }, [persist]);

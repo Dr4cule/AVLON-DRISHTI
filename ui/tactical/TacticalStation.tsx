@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Activity, ArrowUpRight, Check, ChevronDown, CircleHelp, Crosshair, Eye, Flag, Layers3, Radio, Radar, ShieldCheck, Signal, Sparkles, Timer, Wind } from 'lucide-react';
 import type { Simulation } from '../../sim-core/engine';
 import type { Action, ActorKind, Classification, Reason, ResponseKind, SensorKind } from '../../sim-core/types';
@@ -8,6 +8,7 @@ import { TYPE_LABELS, REASON_LABELS, RESPONSE_LABELS, SENSOR_LABELS, formatTime,
 import { RadarMap } from './RadarMap';
 import { SensorFeed } from './SensorFeed';
 import { ThreatAssessment } from '../threat/ThreatAssessment';
+import { playCue } from '../lib/sound';
 
 interface Props {
   sim: Simulation; active: boolean; running: boolean; mode: 'training' | 'assessment'; lowResource: boolean;
@@ -46,6 +47,37 @@ export function TacticalStation({ sim, active, running, mode, lowResource, onAct
   const health = Math.round(Object.values(sim.state.asset_health).reduce((a, b) => a + b, 0) / sim.scenario.assets.length);
   const recent = [...sim.events].reverse().find(e => ['TrackAcknowledged', 'TrackClassified', 'ResponseOrdered', 'ResponseRejected', 'SensorStatusChanged'].includes(e.type));
   const allowedToAct = active && !sim.state.ended && !!track && !track.resolved;
+  // Earcons for missable, time-critical moments only. Silent in assessment
+  // mode; baselined on run start so pre-existing tracks/events never chime
+  // retroactively. New-track cues fire from trainee-visible tracks, never
+  // from canvas paint (which runs every frame).
+  const soundRun = useRef('');
+  const soundSeq = useRef(-1);
+  const soundTracks = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const key = `${sim.scenario.id}:${sim.scenario.seed}:${active}`;
+    if (soundRun.current !== key) {
+      soundRun.current = key;
+      soundSeq.current = sim.events.length - 1;
+      soundTracks.current = new Set(Object.keys(sim.state.tracks));
+      return;
+    }
+    if (!active || mode === 'assessment') return;
+    for (const event of sim.events) {
+      if (event.seq <= soundSeq.current) continue;
+      soundSeq.current = event.seq;
+      if (event.type === 'AssetDamaged') playCue('damage');
+      else if (event.type === 'ResponseRejected') playCue(event.payload.roe_violation === true ? 'rejectedRoe' : 'rejected');
+      else if (event.type === 'ActorResolved' && (event.payload.friendly_harm === true || event.payload.collateral === true)) playCue('adverse');
+      else if (event.type === 'SensorStatusChanged' && event.payload.status !== 'online') playCue('sensorLost');
+    }
+    for (const id of Object.keys(sim.state.tracks)) {
+      if (!soundTracks.current.has(id)) {
+        soundTracks.current.add(id);
+        playCue('newTrack');
+      }
+    }
+  });
   return <>
     <div className="metrics-grid">
       <div className="metric-card"><Timer className="metric-icon" size={17} /><span>EXERCISE TIME</span><strong>{formatTime(sim.state.tick / 4)}</strong><small>of {formatTime(sim.scenario.duration_s)} <span className="metric-trend">{running ? 'IN PROGRESS' : active ? 'PAUSED' : 'READY'}</span></small></div>

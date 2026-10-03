@@ -110,6 +110,28 @@ describe('local API and immutable SQLite records', () => {
     const second = await agent.post('/api/adaptive/recommend').send({}).expect(200);
     expect(second.body.seed).toBe(first.body.seed);
     expect(second.body.scenario).toEqual(first.body.scenario);
+    // AI scenario intelligence travels with the recommendation, deterministically.
+    for (const body of [first.body, second.body]) {
+      expect(body.challenge).toBeTruthy();
+      expect(Array.isArray(body.tactics) && body.tactics.length > 0).toBe(true);
+      expect(Array.isArray(body.patterns)).toBe(true);
+      expect(Array.isArray(body.skillDeltas)).toBe(true);
+    }
+    expect(second.body.challenge).toEqual(first.body.challenge);
+    expect(second.body.tactics).toEqual(first.body.tactics);
+  });
+  it('reports skill movement since the previous session', async () => {
+    const { app } = setup(); const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ id: 'operator', password: 'drishti-demo' });
+    const before = await agent.post('/api/adaptive/recommend').send({}).expect(200);
+    expect(before.body.skillDeltas).toEqual([]);
+    const { body: run } = await agent.post('/api/sessions').send({ scenario: SCRIPTED_SCENARIOS[0], mode: 'training' }).expect(201);
+    await agent.post(`/api/sessions/${run.id}/finish`).send({ tick: run.scenario.duration_s * 4, actions: [] }).expect(200);
+    const after = await agent.post('/api/adaptive/recommend').send({}).expect(200);
+    expect(after.body.skillDeltas.length).toBeGreaterThan(0);
+    for (const d of after.body.skillDeltas) {
+      expect(d.before).not.toBe(d.after);
+    }
   });
   it('validates assignment units/dates and supports update + delete', async () => {
     const { app } = setup();

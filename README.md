@@ -106,7 +106,7 @@ npm run test:e2e           # 2/2 Playwright (API + real-browser judge path)
 
 One shared deterministic core (`sim-core/`, 250 ms fixed ticks, seeded PRNG, no wall-clock) runs in the browser, the Node 24 + built-in SQLite server, and the tests — so replay is byte-identical everywhere. Schemas first (`schemas/`), immutable event log, server never trusts client scores.
 
-**Honest AI:** no neural nets, no LLMs, no cloud calls. Adaptation = published Bayesian Beta skill model; generation = seeded templates + baseline fairness gate; swarms = Reynolds boids heuristics. Everything inspectable in `docs/AI_COMPONENTS.md`.
+**Honest AI:** one tiny trained softmax (linear, explainable) as an adviser only - no LLMs, no cloud calls. Adaptation = published Bayesian Beta skill model; generation = seeded templates + baseline fairness gate; swarms = Reynolds boids heuristics. Everything inspectable in `docs/AI_COMPONENTS.md`.
 
 > ⚠️ All terrain, sensors, and counter-measures are **fictional gameplay models**, not real specifications. Scores are practice heuristics, not readiness certification.
 

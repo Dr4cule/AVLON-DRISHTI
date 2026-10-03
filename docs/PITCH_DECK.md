@@ -22,7 +22,7 @@ One message per slide. Speaker notes in italics.
 
 ## Slide 4 — Technical approach (be brutally honest)
 - **What we wrote:** deterministic seeded simulation core (shared browser/server/tests), ROE decision-tree scorer, Beta-skill adaptive selector, procedural generator with baseline fairness gate.
-- **What we did NOT build:** no neural nets, no LLMs, no real weapon data — everything is fictional gameplay parameters. Say this out loud; judges punish caught AI theater, never honesty.
+- **What we did NOT build:** no LLMs, no giant models, no real weapon data — everything is fictional gameplay parameters. Say this out loud; judges punish caught AI theater, never honesty.
 - Stack (checkable names): React + TypeScript + Canvas, Node 24, SQLite (built-in), Vitest + Playwright. 38 unit tests + browser E2E green.
 - *If asked "where is the AI?": point at the Beta update rule in `sim-core/adaptive.ts` and the generator's fairness loop — small, inspectable, CPU-only.*
 

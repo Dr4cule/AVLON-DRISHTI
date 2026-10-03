@@ -37,5 +37,6 @@ test('judge path: play, decide, debrief verified replay, adaptive next step', as
   // Adaptive panel must recommend a concrete next exercise.
   await page.getByRole('button', { name: 'Adaptive intelligence' }).click();
   await page.getByRole('button', { name: 'Recommend my next exercise' }).click();
-  await expect(page.getByText('RECOMMENDED')).toBeVisible({ timeout: 60000 });
+  await expect(page.getByText('AI RECOMMENDATION')).toBeVisible({ timeout: 60000 });
+  await expect(page.getByText('SCENARIO MODIFIERS')).toBeVisible({ timeout: 15000 });
 });

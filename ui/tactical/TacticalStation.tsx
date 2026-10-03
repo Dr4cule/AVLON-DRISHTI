@@ -7,6 +7,7 @@ import { EFFECTORS } from '../../sim-core/roe';
 import { TYPE_LABELS, REASON_LABELS, RESPONSE_LABELS, SENSOR_LABELS, formatTime, humanize } from '../copy';
 import { RadarMap } from './RadarMap';
 import { SensorFeed } from './SensorFeed';
+import { ThreatAssessment } from '../threat/ThreatAssessment';
 
 interface Props {
   sim: Simulation; active: boolean; running: boolean; mode: 'training' | 'assessment'; lowResource: boolean;
@@ -71,6 +72,7 @@ export function TacticalStation({ sim, active, running, mode, lowResource, onAct
           <SensorFeed track={track} sensor={channel} tick={sim.state.tick} available={sim.scenario.sensors.includes(channel) && sim.state.sensor_status[channel] !== 'offline'} />
           <div className="fusion-readings">{sim.scenario.sensors.map(s => { const reading = track?.sensors[s]; const fresh = reading && sim.state.tick - reading.tick < 20; return <div className="fusion-reading" key={s} title={reading?.evidence ?? 'No observation'}><span className={`sensor-led ${sim.state.sensor_status[s]}`} /><span>{SENSOR_LABELS[s]}</span><div className="reading-bar"><i style={{ width: `${fresh ? reading.confidence * 100 : 0}%` }} /></div><strong>{sim.state.sensor_status[s] === 'offline' ? 'OFF' : fresh ? `${Math.round(reading.confidence * 100)}%` : '—'}</strong></div>; })}</div>
           <p className="fusion-evidence">{track?.sensors[channel]?.evidence ?? 'Inspect independent sensor cues before deciding.'}</p>
+          <ThreatAssessment track={track} scenario={sim.scenario} tick={sim.state.tick} />
         </section>
         <section className="panel decision-panel"><div className="panel-header"><div className="panel-title"><Crosshair size={16} /><h2>Decision workspace</h2></div>{mode === 'training' && <button className="icon-button" aria-label="Show training hint" title="Training hint" onClick={() => setHint(v => !v)}><Sparkles size={15} /></button>}</div>
           <div className="decision-content">

@@ -11,6 +11,7 @@ import { runBaseline } from '../sim-core/baseline';
 import { DIMENSIONS, ENGINE_VERSION, type Action, type Dimension, type RunJournal, type Scenario, type SessionRecord, type SimEvent, type User } from '../sim-core/types';
 import { DEMO_USERS, demoRuns } from './demo';
 import { calibrateDifficulty, emptySkills, profileFromSessions, recommendNext, weaknessRecommendations, type SkillState } from '../sim-core/adaptive';
+import { adversaryTactics, challengeFromWeakness, challengeToOptions, detectPatterns } from '../sim-core/threat/challenge';
 import { generateScenario } from '../sim-core/generator';
 import { hashText, quantize } from '../sim-core/prng';
 
@@ -196,7 +197,7 @@ export class Store {
     const sessions = this.sessions(target);
     const { profile, persisted } = this.skillProfile(userId, sessions);
     const calibration = calibrateDifficulty(sessions);
-    return { profile, calibration, persisted, recommendations: weaknessRecommendations(profile) };
+    return { profile, calibration, persisted, recommendations: weaknessRecommendations(profile), patterns: detectPatterns(userId, sessions) };
   }
   /** Single source of truth for a trainee's skill profile: persisted rows win, fresh compute is the backfill. */
   private skillProfile(userId: string, sessions: SessionRecord[]) {
@@ -213,8 +214,48 @@ export class Store {
     // Deterministic fallback seed derived from user history — same state always
     // yields the same recommendation; no wall-clock leaks into the engine.
     const effective = seed ?? parseInt(hashText([user.id, sessions.length, recent.join(',')].join(':')), 16);
-    const generated = generateScenario({ seed: effective, difficulty: rec.difficulty, focus: rec.focus, recent_fingerprints: rec.recent_fingerprints });
-    return { ...rec, seed: effective, scenario: generated.scenario, fingerprint: generated.fingerprint, baseline: generated.baseline };
+    // AI scenario intelligence: weakness → challenge profile → generator knobs
+    // → adversary emphasis. The fairness gate inside generateScenario stays mandatory.
+    const patterns = detectPatterns(user.id, sessions);
+    const challenge = challengeFromWeakness(profile.weakest);
+    const tactics = adversaryTactics(profile.weakest);
+    const generated = generateScenario({
+      ...challengeToOptions(challenge, {
+        seed: effective,
+        difficulty: rec.difficulty,
+        focus: rec.focus,
+        recent_fingerprints: rec.recent_fingerprints,
+      }),
+      behaviorBias: tactics.map(t => t.behavior),
+    });
+    // Skill movement since the previous session, for the "learning update" moment.
+    // Computed by the same update rule with and without the latest session.
+    const ordered = [...sessions].sort((a, b) => a.started_at.localeCompare(b.started_at));
+    const skillDeltas =
+      ordered.length === 0
+        ? []
+        : DIMENSIONS.map(dimension => {
+            const before = profileFromSessions(
+              user.id,
+              ordered.slice(0, -1).filter(s => !s.synthetic && !s.report.provisional),
+            ).skills[dimension].mean;
+            const after = profile.skills[dimension].mean;
+            return { dimension, before, after };
+          })
+            .filter(d => d.before !== d.after)
+            .sort((a, b) => Math.abs(b.after - b.before) - Math.abs(a.after - a.before))
+            .slice(0, 3);
+    return {
+      ...rec,
+      seed: effective,
+      challenge,
+      tactics,
+      patterns,
+      skillDeltas,
+      scenario: generated.scenario,
+      fingerprint: generated.fingerprint,
+      baseline: generated.baseline,
+    };
   }
   private assertUnit(unit_id: string) {
     if (!this.db.prepare('SELECT id FROM units WHERE id=?').get(unit_id)) throw new HttpError(400, `Unknown unit '${unit_id}'.`);

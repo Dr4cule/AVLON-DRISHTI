@@ -33,3 +33,11 @@ Deliver a single-folder portable bundle containing the current platform's Node r
 ## 008 · Scope priorities
 
 Complete M1–M7 before optional VR, networked team roles, reinforcement-learning adversaries, or Hindi translation. Use externalized domain/UI copy and semantic controls so localization and accessibility have a clear path. Hardware FPS claims must be measured, not inferred from the chosen stack.
+
+## 009 - Pure-TS threat model instead of ONNX
+
+The AI brief allowed ONNX export where practical. It is not practical here: a multinomial softmax in pure TypeScript wins on every stated priority (KB-sized JSON weights, sub-millisecond CPU inference, zero new dependencies) and gives exact linear evidence attribution, which an ONNX black box cannot. Training runs offline via tsx on sim-generated labels; retraining is byte-deterministic. Revisit only if a future model class demonstrates measured benefit on the validation report.
+
+## 010 - Integer difficulty plus expected success instead of fractional levels
+
+The AI brief sketches target difficulty as 3.2/5. The scenario schema defines integer levels 1-5, and inventing fractional levels for presentation would be theater. The system keeps integer difficulty and expresses targeting precision honestly as expected-success percentage plus named scenario modifiers (night, IR loss, conflict, load, ambiguity).

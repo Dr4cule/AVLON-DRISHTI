@@ -1,10 +1,13 @@
-# AVLON DRISHTI — Work Done vs Work Remaining
+
+- `threat.test.ts` x12 - feature extraction determinism, model contract, exact evidence attribution, invalid-input rejection, hostile distribution, training determinism
+- `analysis.test.ts` x3 - explanation from recorded evidence, empty-report fallback, no fabrication on corrupt data
+- `challenge.test.ts` x8 - mistake patterns, challenge-profile mapping for all dimensions, fairness preserved, adversary tactics, bias validation# AVLON DRISHTI — Work Done vs Work Remaining
 
 Date: 2026-10-03, updated after M4–M7 build pass
 Folder: `C:\Bedrock\Work\Drone` only
 Spec: `PROJECT_SPEC.md` is authoritative
 Product: **AVLON DRISHTI — Airspace training system** — offline, adaptive drone-threat decision trainer
-Status: M1–M7 implemented. Typecheck clean. **38/38 Vitest passing.** Production build OK (`dist/web` + `dist/server.cjs`).
+Status: M1–M7 implemented. Typecheck clean. **62/62 Vitest passing (9 files).** Production build OK (`dist/web` + `dist/server.cjs`).
 
 > A visible object is not necessarily hostile. A high-confidence track is confidence in a sensor observation, not permission to respond.
 
@@ -12,7 +15,7 @@ Status: M1–M7 implemented. Typecheck clean. **38/38 Vitest passing.** Producti
 
 M1–M7 are implemented, gated in `docs/CHECKLIST.md`, and hardened (see §5 fix log). The app runs end-to-end: briefing → live imperfect sensor picture → acknowledge/classify/respond with reasons → server-validated scoring → SQLite persistence with persisted skill profiles → synchronized sensor/truth replay → trends/confusion/heatmap → scenario library + seeded generator with baseline feasibility → adaptive next exercise → instructor studio + unit dashboard. Delivered as a vendored offline bundle plus Docker.
 
-Tests now: **38/38 Vitest passing** across 6 files, plus **2/2 Playwright E2E** (API smoke + real-browser judge path). Typecheck clean.
+Tests now: **62/62 Vitest passing** across 9 files, plus **2/2 Playwright E2E** (API smoke + real-browser judge path). Typecheck clean.
 
 ## 2. How to run now
 
@@ -83,18 +86,21 @@ Data: `data/drishti.sqlite` file DB, `:memory:` in tests. No network calls at ru
 - `lib/api.ts`, `useTraining.ts`, `exports.ts` — typed API, fixed-step accumulator loop, 4s checkpoint, browser journal recovery, pace, finish→AAR, CSV escaping
 - `styles.css`, `main.tsx` — graphite/amber/cyan theme, responsive 1600/1150/950/740/520, reduced-motion, print CSS
 
-### Tests — `tests/` — 37 Vitest + 2 Playwright, all passing
+### Tests — `tests/` — 62 Vitest + 2 Playwright, all passing
 - `core.test.ts` ×5 — exact replay, seed sensitivity, no truth leak, schema/action validation, PRNG repeat + report schema
 - `sensors-roe.test.ts` ×7 — dropout restore, jam reduces detections, bearing-only range, warning/kinetic/civilian gates, IFF block no charge, group determinism
-- `generator.test.ts` ×5 — 8 scripted valid+feasible, 50 generated L1-5 valid+feasible, reproducibility, fingerprint diversity, constraints/errors
+- `generator.test.ts` ×5 — 10 scripted valid+feasible, 50 generated L1-5 valid+feasible, reproducibility, fingerprint diversity, constraints/errors
 - `scoring.test.ts` ×6 — zero provisional, baseline ≥90 with nodes, benign-as-hostile critical at tick, violation retained, partial type credit 80, snapshot-mutation immunity
 - `adaptive.test.ts` ×5 — skill init/uncertainty shrink, weakest-dimension targeting, deterministic difficulty, cold-start flag, calibration buckets
+- `threat.test.ts` ×12 — feature extraction determinism, model contract, exact evidence attribution, invalid-input rejection, hostile distribution, training determinism
+- `analysis.test.ts` ×3 — explanation from recorded evidence, empty-report fallback, no fabrication on corrupt data
+- `challenge.test.ts` ×8 — mistake patterns, challenge-profile mapping for all dimensions, fairness preserved, adversary tactics, bias validation
 - `backend.test.ts` ×10 — synthetic reproducibility, recompute+immutable+idempotent, prefix/tick guards + 409 events, auth/ownership/origin, distinct retry + draft recovery, **skill persistence + persisted flag, cross-profile role gates, deterministic recommend, assignment lifecycle + validation, instructor library saves**
 - `tests/e2e/demo.spec.ts` — API smoke (health/login/bootstrap/generate/recommend)
 - `tests/e2e/judge-path.spec.ts` — real Chromium: start → ack/classify/respond → debrief → REPLAY VERIFIED → adaptive recommendation (isolated DB)
 
 ### Docs/packaging now
-- `docs/` — DECISIONS, RESEARCH (with official SIH26247 verification), CHECKLIST (all gates evidenced), PROGRESS, SCORING, SCENARIO_SCHEMA, AI_COMPONENTS, INSTALL, DEMO_SCRIPT, DEPLOYMENT, PITCH_DECK, DRONE_WARFARE_RESEARCH
+- `docs/` — DECISIONS, RESEARCH (with official SIH26247 verification), CHECKLIST (all gates evidenced), PROGRESS, SCORING, SCENARIO_SCHEMA, AI_COMPONENTS, AI_THREAT_REPORT, INSTALL, DEMO_SCRIPT, DEPLOYMENT, PITCH_DECK, DRONE_WARFARE_RESEARCH
 - `packaging/bundle.mjs` — stages `release/AVLON-DRISHTI` with vendored Node v24.13.0 (boot-verified); `Dockerfile` + `docker-compose.yml` + `.dockerignore`
 
 ## 4. Done by milestone

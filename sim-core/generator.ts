@@ -1,11 +1,17 @@
 import { Random, hashText, clamp } from './prng';
 import { assertScenario, scenarioErrors } from './validation';
 import { runBaseline, type BaselineReport } from './baseline';
-import { DIMENSIONS, type ActorSpec, type Dimension, type Scenario } from './types';
+import { DIMENSIONS, type ActorSpec, type Behavior, type Dimension, type Scenario } from './types';
+
+export const KNOWN_BEHAVIORS: Behavior[] = ['approach', 'loiter', 'patrol_loop', 'random_walk', 'flocking', 'saturation', 'decoy_and_strike', 'leader_follower', 'probe_withdraw'];
 
 export interface GenerationOptions {
   seed: number; difficulty: number; difficulty_profile?: Partial<Record<Dimension, number>>;
   focus?: Dimension; constraints?: Partial<Scenario['environment']>; recent_fingerprints?: string[];
+  /** Optional adversary emphasis: hostile group behaviors are drawn from this
+   * list when possible (falls back to the full list otherwise). The fairness
+   * gate still applies to whatever is built. */
+  behaviorBias?: Behavior[];
 }
 export interface GeneratedScenario { scenario: Scenario; fingerprint: string; baseline: BaselineReport; attempts: number }
 
@@ -36,8 +42,12 @@ function candidate(options: GenerationOptions, seed: number): Scenario {
     spawn_s: actors.length * random.int(5, 12), speed_mps: 12 + difficulty * 3 + random.int(0, 3),
     altitude_m: random.int(60, 180), iff: false, civilian_area: false, ...partial,
   });
-  add(swarm ? { kind: 'swarm', count: Math.min(7, difficulty + 1), behavior: random.pick(['flocking', 'saturation', 'leader_follower'] as const) } : { kind: difficulty >= 4 ? 'fast_mover' : random.pick(['quadcopter', 'fixed_wing'] as const) });
-  if (difficulty >= 3) add({ kind: 'recon', behavior: random.pick(['approach', 'decoy_and_strike'] as const), spawn_s: random.int(30, 55), civilian_area: environment.terrain === 'urban' });
+  const bias = (pool: readonly Behavior[]): readonly Behavior[] => {
+    const hit = pool.filter(b => options.behaviorBias?.includes(b));
+    return hit.length > 0 ? hit : pool;
+  };
+  add(swarm ? { kind: 'swarm', count: Math.min(7, difficulty + 1), behavior: random.pick(bias(['flocking', 'saturation', 'leader_follower'])) } : { kind: difficulty >= 4 ? 'fast_mover' : random.pick(['quadcopter', 'fixed_wing'] as const) });
+  if (difficulty >= 3) add({ kind: 'recon', behavior: random.pick(bias(['approach', 'decoy_and_strike'])), spawn_s: random.int(30, 55), civilian_area: environment.terrain === 'urban' });
   // Wire-guided intruders appear in degraded-spectrum exercises: RF-quiet, slow,
   // and low — the trainee must fall back to visual/thermal/acoustic evidence.
   if (degraded && difficulty >= 3 && random.next() < 0.5) add({ kind: 'fiber_optic', behavior: 'approach', speed_mps: 12 + random.int(0, 4), altitude_m: random.int(40, 90), spawn_s: random.int(10, 40) });
@@ -64,6 +74,9 @@ export function generateScenario(options: GenerationOptions): GeneratedScenario 
   if (options.focus && !DIMENSIONS.includes(options.focus)) throw new Error('Unknown training dimension.');
   for (const [dimension, level] of Object.entries(options.difficulty_profile ?? {})) {
     if (!DIMENSIONS.includes(dimension as Dimension) || !Number.isInteger(level) || level < 0 || level > 5) throw new Error('Invalid difficulty profile.');
+  }
+  if (options.behaviorBias !== undefined) {
+    if (!Array.isArray(options.behaviorBias) || options.behaviorBias.length === 0 || !options.behaviorBias.every(b => KNOWN_BEHAVIORS.includes(b))) throw new Error('Invalid behavior bias: must be a non-empty list of known behaviors.');
   }
   const recent = new Set(options.recent_fingerprints?.slice(-12) ?? []);
   for (let attempt = 0; attempt < 40; attempt++) {

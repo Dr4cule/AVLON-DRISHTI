@@ -81,7 +81,7 @@ await page.screenshot({ path: 'docs/images/03-aar.png', fullPage: true });
 // 4 — Adaptive intelligence with a recommendation.
 await page.getByRole('button', { name: 'Adaptive intelligence' }).click();
 await page.getByRole('button', { name: 'Recommend my next exercise' }).click();
-await page.getByText('RECOMMENDED').waitFor({ timeout: 60000 });
+await page.getByText('AI RECOMMENDATION').waitFor({ timeout: 60000 });
 await page.waitForTimeout(800);
 await page.screenshot({ path: 'docs/images/04-adaptive.png', fullPage: true });
 await ctx.close();

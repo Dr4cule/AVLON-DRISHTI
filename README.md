@@ -10,7 +10,7 @@
 
 ![Node 24](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)
 ![Offline first](https://img.shields.io/badge/offline-first-0%20external%20calls-e9ad65)
-![Tests](https://img.shields.io/badge/tests-38%2F38%20vitest%20%2B%202%2F2%20playwright-76c6d0)
+![Tests](https://img.shields.io/badge/tests-75%2F75%20vitest%20%2B%202%2F2%20playwright-76c6d0)
 ![License MIT](https://img.shields.io/badge/license-MIT-a9bd8d)
 
 *A visible object is not necessarily hostile. A high-confidence track is confidence in a sensor observation — not permission to respond.*
@@ -98,15 +98,22 @@ npm run dev      # UI :5173 + API :3001
 
 ```powershell
 npm run typecheck          # clean
-npm test                   # 38/38 Vitest
+npm test                   # 75/75 Vitest
 npm run test:e2e           # 2/2 Playwright (API + real-browser judge path)
+npm run train:threat       # regenerate the threat model (deterministic, seconds)
 ```
 
 ## Under the hood
 
 One shared deterministic core (`sim-core/`, 250 ms fixed ticks, seeded PRNG, no wall-clock) runs in the browser, the Node 24 + built-in SQLite server, and the tests — so replay is byte-identical everywhere. Schemas first (`schemas/`), immutable event log, server never trusts client scores.
 
-**Honest AI:** one tiny trained softmax (linear, explainable) as an adviser only - no LLMs, no cloud calls. Adaptation = published Bayesian Beta skill model; generation = seeded templates + baseline fairness gate; swarms = Reynolds boids heuristics. Everything inspectable in `docs/AI_COMPONENTS.md`.
+**AI capabilities**
+1. Tiny trained threat-assessment model (15 features → 6 classes, ~2.3 KB, <1 ms CPU, scenario-level validated)
+2. Bayesian trainee skill model with persisted state and pattern detection
+3. Adaptive challenge generation (weakness → modifiers → fair generated exercise)
+4. Evidence-based AAR analysis (reconstructs what the model estimated, from recorded events only)
+
+No LLM · No cloud inference · No GPU requirement · No AI-controlled scoring · Human remains the final decision authority. Swarms use Reynolds boids heuristics. Everything inspectable in `docs/AI_COMPONENTS.md`, measured in `docs/AI_THREAT_REPORT.md`.
 
 > ⚠️ All terrain, sensors, and counter-measures are **fictional gameplay models**, not real specifications. Scores are practice heuristics, not readiness certification.
 
@@ -118,7 +125,7 @@ One shared deterministic core (`sim-core/`, 250 ms fixed ticks, seeded PRNG, no 
 ├── ui/              # React + Canvas tactical app: mission, library, AAR, adaptive, studio, readiness
 ├── scenarios/       # 10 scripted exercises (JSON, schema-validated)
 ├── schemas/         # scenario / action / event / score-report contracts
-├── tests/ + tests/e2e  # 38 Vitest + 2 Playwright
+├── tests/ + tests/e2e  # 75 Vitest (10 files) + 2 Playwright
 ├── docs/            # full documentation set (start at docs/PROGRESS.md)
 ├── docs/images/     # screenshots above (regenerate: node packaging/screenshots.mjs)
 ├── packaging/       # dev runner, offline bundler, screenshot capture

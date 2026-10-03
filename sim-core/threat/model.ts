@@ -21,6 +21,12 @@ interface WeightTable {
   features: string[];
   weights: number[][];
   bias: number[];
+  /**
+   * Optional temperature from deterministic calibration (fit on a split that
+   * is never reported). 1 (or absent) = raw softmax. Applied as logits / T,
+   * so inference stays a few dot products and bit-deterministic.
+   */
+  temperature?: number;
 }
 
 function assertValid(table: WeightTable): asserts table is WeightTable {
@@ -33,9 +39,11 @@ function assertValid(table: WeightTable): asserts table is WeightTable {
     !table.weights.every(row => row.length === FEATURE_NAMES.length) ||
     table.bias.length !== THREAT_CLASSES.length ||
     !table.classes.every((c, i) => c === THREAT_CLASSES[i]) ||
-    !table.features.every((f, i) => f === FEATURE_NAMES[i])
+    !table.features.every((f, i) => f === FEATURE_NAMES[i]) ||
+    (table.temperature !== undefined &&
+      (!Number.isFinite(table.temperature) || table.temperature < 0.1 || table.temperature > 10))
   ) {
-    throw new Error('Threat weights table is missing or incompatible (expected v1, 6 classes, 14 features).');
+    throw new Error('Threat weights table is missing or incompatible (expected v1, 6 classes, 15 features).');
   }
 }
 
@@ -61,8 +69,9 @@ export function predict(features: number[], table: WeightTable = getWeights()): 
   if (features.length !== FEATURE_NAMES.length || features.some(v => !Number.isFinite(v))) {
     throw new Error(`Threat model expects ${FEATURE_NAMES.length} finite features.`);
   }
+  const temperature = table.temperature ?? 1;
   const logits = table.classes.map(
-    (_, c) => table.bias[c] + table.weights[c].reduce((sum, w, i) => sum + w * features[i], 0),
+    (_, c) => (table.bias[c] + table.weights[c].reduce((sum, w, i) => sum + w * features[i], 0)) / temperature,
   );
   const max = Math.max(...logits);
   const exps = logits.map(l => Math.exp(l - max));

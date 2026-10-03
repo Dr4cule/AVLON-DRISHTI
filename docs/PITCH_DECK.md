@@ -21,10 +21,12 @@ One message per slide. Speaker notes in italics.
 - The one-line hook: *"We train judgment under doubt, not reflexes — confidence is evidence quality, not permission to act."*
 
 ## Slide 4 — Technical approach (be brutally honest)
-- **What we wrote:** deterministic seeded simulation core (shared browser/server/tests), ROE decision-tree scorer, Beta-skill adaptive selector, procedural generator with baseline fairness gate.
-- **What we did NOT build:** no LLMs, no giant models, no real weapon data — everything is fictional gameplay parameters. Say this out loud; judges punish caught AI theater, never honesty.
-- Stack (checkable names): React + TypeScript + Canvas, Node 24, SQLite (built-in), Vitest + Playwright. 38 unit tests + browser E2E green.
-- *If asked "where is the AI?": point at the Beta update rule in `sim-core/adaptive.ts` and the generator's fairness loop — small, inspectable, CPU-only.*
+- **The loop (draw this):** SIMULATED SENSOR DATA → 15-feature trained model → threat hypothesis + model confidence + evidence → HUMAN DECIDES → deterministic scoring → AAR/replay → Bayesian skill model → adaptive challenge → procedural generation → (loop).
+- **Where is the AI? (three answers, in this order):** (1) a tiny *trained* softmax threat model — 15 features → 6 classes, learned from 14,874 sim-generated snapshots, scenario-level held-out validation, macro F1 0.60 vs 0.56 heuristic vs 0.10 majority; (2) a Bayesian skill model with persisted skill state and pattern detection; (3) challenge-profile scenario intelligence with a mandatory fairness gate.
+- **What we did NOT build:** no LLMs, no giant models, no ONNX runtime (a WASM black box would cost us exact evidence attribution), no real weapon data — everything is fictional gameplay parameters. Say this out loud; judges punish caught AI theater, never honesty.
+- **AI metrics block (copy from `docs/AI_THREAT_REPORT.md`, never from memory):** 15 features → 6 classes · 14,874 synthetic observations · 230 scenarios · scenario-level held-out validation · accuracy 69.3% · macro F1 0.60 · balanced accuracy 0.68 · ECE 0.109→0.046 · model ~2.3 KB · inference <1 ms CPU · offline.
+- Stack (checkable names): React + TypeScript + Canvas, Node 24, SQLite (built-in), Vitest + Playwright. 75 unit tests + browser E2E green.
+- *Key line: **AI recommends. Deterministic simulation verifies. Human decides.***
 
 ## Slide 5 — Feasibility, viability, impact
 - Feasibility: runs today on an ordinary laptop; vendored offline bundle; Docker option. Risks named: `node:sqlite` experimental → pinned + vendored runtime; no real sensor data → synthetic-but-schema-faithful fixtures, replay-verified.

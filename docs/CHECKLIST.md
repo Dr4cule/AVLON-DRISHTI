@@ -28,7 +28,7 @@ Passed production build/typecheck and five generator checks. All ten scripted ex
 
 ### M4
 
-Passed typecheck, `tests/scoring.test.ts` (6), and `tests/backend.test.ts` (10, incl. synthetic reproducibility, score recompute, append-only enforcement, auth/ownership, draft recovery). Decision-tree scoring recomputed server-side from the immutable event log; SQLite with append-only triggers; checkpoint autosave + browser-journal recovery; exact replay with hash verification badge; sensor/truth/split replay, timeline markers, per-contact decision trace, trends/confusion/heatmap, CSV/JSON/print export.
+Passed typecheck, `tests/scoring.test.ts` (6), and `tests/backend.test.ts` (11, incl. synthetic reproducibility, score recompute, append-only enforcement, auth/ownership, draft recovery). Decision-tree scoring recomputed server-side from the immutable event log; SQLite with append-only triggers; checkpoint autosave + browser-journal recovery; exact replay with hash verification badge; sensor/truth/split replay, timeline markers, per-contact decision trace, trends/confusion/heatmap, CSV/JSON/print export.
 
 ### M5
 
@@ -44,4 +44,4 @@ Verified via backend tests (assignment validation/lifecycle, instructor-scenario
 
 ### Hardening + warfare-research pass
 
-Crash-proofing (ErrorBoundary at shell + tactical station, validated studio imports, guarded restore recovery), `fiber_optic` EM-immune archetype, scenarios 09 (spotter–striker night wave) and 10 (wire-guided + civilian restraint) with real-tactic footnotes, present-mode projector toggle, empty-state CTAs, deterministic recommend-by-default, 20 synthetic demo sessions, `docs/PITCH_DECK.md` + `docs/DEPLOYMENT.md` + backup-video shot list. Suite: 38/38 Vitest, 2/2 Playwright, typecheck clean, bundle re-verified.
+Crash-proofing (ErrorBoundary at shell + tactical station, validated studio imports, guarded restore recovery), `fiber_optic` EM-immune archetype, scenarios 09 (spotter–striker night wave) and 10 (wire-guided + civilian restraint) with real-tactic footnotes, present-mode projector toggle, empty-state CTAs, deterministic recommend-by-default, 24 synthetic demo sessions, `docs/PITCH_DECK.md` + `docs/DEPLOYMENT.md` + backup-video shot list. Suite: 75/75 Vitest, 2/2 Playwright, typecheck clean, bundle re-verified.

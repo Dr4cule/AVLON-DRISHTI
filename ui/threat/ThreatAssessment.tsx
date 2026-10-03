@@ -66,9 +66,9 @@ export function ThreatAssessment({
           <span className="eyebrow">PRIMARY HYPOTHESIS</span>
           <strong>{CLASS_LABELS[result.predictedClass] ?? humanize(result.predictedClass)}</strong>
         </div>
-        <div className="threat-confidence">
+        <div className="threat-confidence" title="The model's own probability estimate (ECE-validated, see training report) — not a physical probability.">
           <strong>{Math.round(result.confidence * 100)}%</strong>
-          <span>CONFIDENCE</span>
+          <span>MODEL CONFIDENCE</span>
         </div>
         <div className="threat-confidence">
           <strong>{agreement}%</strong>

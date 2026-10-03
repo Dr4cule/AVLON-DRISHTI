@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { heuristicPredict, splitRows, stressCategory, type Row } from '../sim-core/threat/train';
 import { Simulation, replay } from '../sim-core/engine';
 import { SCRIPTED_SCENARIOS } from '../sim-core/catalog';
 import { extractFeatures, FEATURE_NAMES, labelFor, THREAT_CLASSES } from '../sim-core/threat/features';
@@ -90,6 +91,73 @@ describe('threat softmax model', () => {
     expect(uncertaintyBand(0.1)).toBe('LOW');
     expect(uncertaintyBand(0.4)).toBe('MEDIUM');
     expect(uncertaintyBand(0.9)).toBe('HIGH');
+  });
+  it('sharpens confidence with temperature < 1 and rejects bad temperatures', () => {
+    const { sim, track } = liveTrack(160);
+    const x = extractFeatures(track, scenario, sim.state.tick);
+    const table = getWeights();
+    const plain = predict(x, { ...table, temperature: 1 });
+    const sharp = predict(x, { ...table, temperature: 0.5 });
+    expect(sharp.confidence).toBeGreaterThanOrEqual(plain.confidence);
+    expect(sharp.predictedClass).toBe(plain.predictedClass);
+    for (const bad of [0, -1, 99, NaN]) {
+      expect(() => setWeightsForTests({ ...table, temperature: bad })).toThrow();
+    }
+    setWeightsForTests(null);
+  });
+  it('splits scenarios with zero train/test overlap, deterministically', () => {
+    const rows: Row[] = [];
+    for (let s = 0; s < 30; s++) {
+      for (let i = 0; i < 5; i++) {
+        rows.push({
+          x: new Array(FEATURE_NAMES.length).fill(0.1 * i), y: i % 6, s: `scn-${s}`,
+          ageSec: 10, fresh: 3, terrain: 'rural', tod: 'day', weather: 'clear',
+          em: 'clean', difficulty: 2, distractorsTag: 1,
+        });
+      }
+    }
+    const first = splitRows(rows);
+    const second = splitRows(rows);
+    expect(first).toEqual(second);
+    const trainIds = new Set(first.train.map(r => r.s));
+    const testIds = new Set(first.test.map(r => r.s));
+    for (const id of testIds) expect(trainIds.has(id)).toBe(false);
+    const calibIds = new Set(first.calib.map(r => r.s));
+    for (const id of calibIds) {
+      expect(trainIds.has(id)).toBe(false);
+      expect(testIds.has(id)).toBe(false);
+    }
+    expect(first.train.length).toBeGreaterThan(first.calib.length);
+    expect(first.test.length).toBeGreaterThan(0);
+  });
+  it('places every sample in exactly one stress category', () => {
+    const { sim } = liveTrack(160);
+    void sim;
+    const base: Row = {
+      x: new Array(FEATURE_NAMES.length).fill(0.5), y: 0, s: 'x', ageSec: 30,
+      fresh: 3, terrain: 'rural', tod: 'day', weather: 'clear', em: 'clean',
+      difficulty: 2, distractorsTag: 0,
+    };
+    expect(stressCategory(base)).toBe('NORMAL');
+    expect(stressCategory({ ...base, tod: 'night' })).toBe('NIGHT');
+    expect(stressCategory({ ...base, em: 'jammed' })).toBe('DEGRADED SENSORS');
+    expect(stressCategory({ ...base, x: base.x.map((v, i) => (i === 10 ? 0.1 : v)) })).toBe('HIGH SENSOR CONFLICT');
+    expect(stressCategory({ ...base, distractorsTag: 4 })).toBe('HIGH AMBIGUITY');
+  });
+  it('heuristic baseline emits valid classes deterministically', () => {
+    const zeros = new Array(FEATURE_NAMES.length).fill(0);
+    expect(THREAT_CLASSES[heuristicPredict(zeros)]).toBeTruthy();
+    const { sim, track } = liveTrack(160);
+    const x = extractFeatures(track, scenario, sim.state.tick);
+    expect(heuristicPredict(x)).toBe(heuristicPredict(x));
+    expect(THREAT_CLASSES[heuristicPredict(x)]).toBeTruthy();
+  });
+  it('never reads ground truth inside feature extraction', () => {
+    const source = readFileSync('sim-core/threat/features.ts', 'utf8');
+    const extractor = source.slice(0, source.indexOf('export function labelFor'));
+    expect(extractor).not.toMatch(/allegiance/);
+    expect(extractor).not.toMatch(/entity\./);
+    expect(extractor).not.toMatch(/\.kind/);
   });
   it('classifies most established hostile tracks as hostile-like', () => {
     // Distribution-level check matching the reported hostile recall (~0.69):

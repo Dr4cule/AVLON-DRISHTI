@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0", "id": "false-positives", "title": "False positives", "source": "scripted", "seed": 482904,
+  "description": "Not every radar return is a threat. A busy rural sky contains wildlife, passive objects, sensor artifacts, and one persistent platform. Restraint matters as much as speed.",
+  "environment": { "terrain": "rural", "time_of_day": "day", "weather": "wind", "em_conditions": "high_clutter" },
+  "assets": [{ "id": "A1", "type": "command_post", "pos": [0, 0], "value": 100 }],
+  "sensors": ["radar", "eo", "acoustic", "rf"], "sensor_degradations": [],
+  "roe": { "kinetic_allowed": false, "jam_allowed_over_civilian_area": false, "weapons_free_after_s": null, "warning_required": false, "min_confidence": 0.55 },
+  "actors": [
+    { "id": "C1", "kind": "bird_flock", "allegiance": "benign", "count": 2, "behavior": "random_walk", "spawn": { "bearing_deg": 30, "range_m": 2200 }, "spawn_s": 0, "speed_mps": 12, "altitude_m": 60, "iff": false, "civilian_area": false },
+    { "id": "C2", "kind": "recon", "allegiance": "hostile", "count": 1, "behavior": "loiter", "spawn": { "bearing_deg": 220, "range_m": 2450 }, "spawn_s": 8, "speed_mps": 17, "altitude_m": 130, "iff": false, "civilian_area": false },
+    { "id": "C3", "kind": "kite", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 125, "range_m": 1650 }, "spawn_s": 0, "speed_mps": 3, "altitude_m": 50, "iff": false, "civilian_area": true },
+    { "id": "C4", "kind": "balloon", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 290, "range_m": 1900 }, "spawn_s": 0, "speed_mps": 4, "altitude_m": 110, "iff": false, "civilian_area": false },
+    { "id": "C5", "kind": "clutter", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 175, "range_m": 2750 }, "spawn_s": 10, "speed_mps": 5, "altitude_m": 20, "iff": false, "civilian_area": false }
+  ],
+  "ground_truth_tree": "decision-v1", "difficulty": 3,
+  "difficulty_tags": { "night": 0, "swarm": 0, "degraded_sensors": 2, "distractors": 5, "urban": 0, "speed_pressure": 0, "roe_complexity": 2 }, "duration_s": 180
+}

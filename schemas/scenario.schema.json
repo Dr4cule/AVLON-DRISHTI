@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "drishti/scenario/1.0",
+  "title": "AVLON DRISHTI scenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "title", "description", "source", "seed", "environment", "assets", "sensors", "sensor_degradations", "roe", "actors", "ground_truth_tree", "difficulty", "difficulty_tags", "duration_s"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,80}$" },
+    "title": { "type": "string", "minLength": 3, "maxLength": 100 },
+    "description": { "type": "string", "maxLength": 1200 },
+    "source": { "enum": ["scripted", "generated", "instructor"] },
+    "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["terrain", "time_of_day", "weather", "em_conditions"],
+      "properties": {
+        "terrain": { "enum": ["rural", "urban", "mountain"] },
+        "time_of_day": { "enum": ["day", "dusk", "night"] },
+        "weather": { "enum": ["clear", "fog", "rain", "wind", "glare"] },
+        "em_conditions": { "enum": ["clean", "jammed", "high_clutter"] }
+      }
+    },
+    "assets": {
+      "type": "array", "minItems": 1, "maxItems": 4,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "type", "pos", "value"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "type": { "enum": ["command_post", "convoy", "checkpoint", "building"] },
+          "pos": { "$ref": "#/definitions/position" },
+          "value": { "type": "number", "minimum": 1, "maximum": 1000 }
+        }
+      }
+    },
+    "sensors": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/definitions/sensor" } },
+    "sensor_degradations": {
+      "type": "array", "maxItems": 12,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["sensor", "kind", "start_s", "dur_s"],
+        "properties": {
+          "sensor": { "$ref": "#/definitions/sensor" },
+          "kind": { "enum": ["dropout", "noise"] },
+          "start_s": { "type": "integer", "minimum": 0, "maximum": 900 },
+          "dur_s": { "type": "integer", "minimum": 1, "maximum": 300 }
+        }
+      }
+    },
+    "roe": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kinetic_allowed", "jam_allowed_over_civilian_area", "weapons_free_after_s", "warning_required", "min_confidence"],
+      "properties": {
+        "kinetic_allowed": { "type": "boolean" },
+        "jam_allowed_over_civilian_area": { "type": "boolean" },
+        "weapons_free_after_s": { "type": ["integer", "null"], "minimum": 0, "maximum": 900 },
+        "warning_required": { "type": "boolean" },
+        "min_confidence": { "type": "number", "minimum": 0.3, "maximum": 0.9 }
+      }
+    },
+    "actors": {
+      "type": "array", "minItems": 1, "maxItems": 24,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "kind", "allegiance", "count", "behavior", "spawn", "spawn_s", "speed_mps", "altitude_m", "iff", "civilian_area"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,40}$" },
+          "kind": { "enum": ["quadcopter", "fixed_wing", "fast_mover", "recon", "swarm", "bird_flock", "kite", "balloon", "helicopter", "friendly_uav", "clutter", "fiber_optic"] },
+          "allegiance": { "enum": ["hostile", "friendly", "benign"] },
+          "count": { "type": "integer", "minimum": 1, "maximum": 12 },
+          "behavior": { "enum": ["approach", "loiter", "patrol_loop", "random_walk", "flocking", "saturation", "decoy_and_strike", "leader_follower", "probe_withdraw"] },
+          "spawn": {
+            "type": "object", "additionalProperties": false, "required": ["bearing_deg", "range_m"],
+            "properties": {
+              "bearing_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+              "range_m": { "type": "number", "minimum": 600, "maximum": 4400 }
+            }
+          },
+          "spawn_s": { "type": "integer", "minimum": 0, "maximum": 840 },
+          "speed_mps": { "type": "number", "minimum": 2, "maximum": 65 },
+          "altitude_m": { "type": "number", "minimum": 10, "maximum": 900 },
+          "iff": { "type": "boolean" },
+          "civilian_area": { "type": "boolean" }
+        }
+      }
+    },
+    "ground_truth_tree": { "const": "decision-v1" },
+    "difficulty": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "difficulty_tags": {
+      "type": "object", "additionalProperties": false,
+      "required": ["night", "swarm", "degraded_sensors", "distractors", "urban", "speed_pressure", "roe_complexity"],
+      "properties": {
+        "night": { "$ref": "#/definitions/level" },
+        "swarm": { "$ref": "#/definitions/level" },
+        "degraded_sensors": { "$ref": "#/definitions/level" },
+        "distractors": { "$ref": "#/definitions/level" },
+        "urban": { "$ref": "#/definitions/level" },
+        "speed_pressure": { "$ref": "#/definitions/level" },
+        "roe_complexity": { "$ref": "#/definitions/level" }
+      }
+    },
+    "duration_s": { "type": "integer", "minimum": 60, "maximum": 900 }
+  },
+  "definitions": {
+    "position": { "type": "array", "items": { "type": "number", "minimum": -4400, "maximum": 4400 }, "minItems": 2, "maxItems": 2 },
+    "sensor": { "enum": ["radar", "eo", "ir", "acoustic", "rf"] },
+    "level": { "type": "integer", "minimum": 0, "maximum": 5 }
+  }
+}

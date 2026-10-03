@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0", "id": "familiar-stranger", "title": "Familiar stranger", "source": "scripted", "seed": 482905,
+  "description": "A familiar airframe does not guarantee a familiar intent. Reconcile movement with delayed IFF and avoid turning an uncertain observation into a friendly-fire decision.",
+  "environment": { "terrain": "urban", "time_of_day": "dusk", "weather": "clear", "em_conditions": "high_clutter" },
+  "assets": [{ "id": "A1", "type": "checkpoint", "pos": [0, 0], "value": 100 }],
+  "sensors": ["radar", "eo", "ir", "rf"], "sensor_degradations": [{ "sensor": "rf", "kind": "dropout", "start_s": 0, "dur_s": 12 }],
+  "roe": { "kinetic_allowed": false, "jam_allowed_over_civilian_area": false, "weapons_free_after_s": null, "warning_required": true, "min_confidence": 0.6 },
+  "actors": [
+    { "id": "C1", "kind": "friendly_uav", "allegiance": "friendly", "count": 1, "behavior": "patrol_loop", "spawn": { "bearing_deg": 42, "range_m": 2250 }, "spawn_s": 0, "speed_mps": 23, "altitude_m": 95, "iff": true, "civilian_area": false },
+    { "id": "C2", "kind": "quadcopter", "allegiance": "hostile", "count": 1, "behavior": "approach", "spawn": { "bearing_deg": 242, "range_m": 2900 }, "spawn_s": 20, "speed_mps": 20, "altitude_m": 80, "iff": false, "civilian_area": true },
+    { "id": "C3", "kind": "bird_flock", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 150, "range_m": 1950 }, "spawn_s": 0, "speed_mps": 13, "altitude_m": 60, "iff": false, "civilian_area": false }
+  ],
+  "ground_truth_tree": "decision-v1", "difficulty": 3,
+  "difficulty_tags": { "night": 1, "swarm": 0, "degraded_sensors": 2, "distractors": 4, "urban": 2, "speed_pressure": 1, "roe_complexity": 5 }, "duration_s": 180
+}

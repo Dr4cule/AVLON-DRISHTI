@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0", "id": "after-dark", "title": "After dark", "source": "scripted", "seed": 482903,
+  "description": "A remote mountain station enters the night shift. Use thermal evidence to understand a persistent contact while the terrain masks other channels.",
+  "environment": { "terrain": "mountain", "time_of_day": "night", "weather": "clear", "em_conditions": "clean" },
+  "assets": [{ "id": "A1", "type": "building", "pos": [0, 0], "value": 100 }],
+  "sensors": ["radar", "ir", "acoustic", "rf"], "sensor_degradations": [],
+  "roe": { "kinetic_allowed": false, "jam_allowed_over_civilian_area": false, "weapons_free_after_s": null, "warning_required": false, "min_confidence": 0.55 },
+  "actors": [
+    { "id": "C1", "kind": "fixed_wing", "allegiance": "hostile", "count": 1, "behavior": "loiter", "spawn": { "bearing_deg": 65, "range_m": 2550 }, "spawn_s": 0, "speed_mps": 28, "altitude_m": 170, "iff": false, "civilian_area": false },
+    { "id": "C2", "kind": "balloon", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 250, "range_m": 1850 }, "spawn_s": 0, "speed_mps": 4, "altitude_m": 80, "iff": false, "civilian_area": false }
+  ],
+  "ground_truth_tree": "decision-v1", "difficulty": 2,
+  "difficulty_tags": { "night": 3, "swarm": 0, "degraded_sensors": 1, "distractors": 1, "urban": 0, "speed_pressure": 1, "roe_complexity": 1 }, "duration_s": 180
+}

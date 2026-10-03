@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "drishti/score/1.0",
+  "title": "Decision-tree score report",
+  "type": "object", "additionalProperties": false,
+  "required": ["version", "total", "grade", "metrics", "actors", "mistakes", "confusion_matrix", "detection_mean_s", "asset_health", "event_hash", "duration_s", "completion", "provisional"],
+  "properties": {
+    "version": { "const": "1.0" },
+    "total": { "$ref": "#/definitions/score" },
+    "grade": { "enum": ["Distinguished", "Proficient", "Developing", "Needs practice"] },
+    "metrics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["detection", "classification", "decision", "outcome", "reasoning"],
+      "properties": {
+        "detection": { "$ref": "#/definitions/score" },
+        "classification": { "$ref": "#/definitions/score" },
+        "decision": { "$ref": "#/definitions/score" },
+        "outcome": { "$ref": "#/definitions/score" },
+        "reasoning": { "$ref": "#/definitions/score" }
+      }
+    },
+    "actors": {
+      "type": "array", "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["actor_id", "label", "truth", "classification", "score", "nodes", "ideal_path"],
+        "properties": {
+          "actor_id": { "type": "string" }, "label": { "type": "string" },
+          "truth": { "enum": ["hostile", "friendly", "benign"] },
+          "classification": { "enum": ["hostile", "friendly", "benign", "unknown"] },
+          "score": { "$ref": "#/definitions/score" },
+          "ideal_path": { "type": "array", "items": { "type": "string" } },
+          "nodes": { "type": "array", "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["name", "passed", "detail", "points"],
+            "properties": { "name": { "type": "string" }, "passed": { "type": "boolean" }, "detail": { "type": "string" }, "points": { "$ref": "#/definitions/score" } }
+          } }
+        }
+      }
+    },
+    "mistakes": { "type": "array", "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tick", "actor_id", "category", "severity", "message", "recommendation"],
+      "properties": {
+        "tick": { "type": "integer", "minimum": 0 }, "actor_id": { "type": "string" },
+        "category": { "enum": ["detection", "classification", "decision", "roe", "reasoning", "timing"] },
+        "severity": { "enum": ["info", "warning", "critical"] },
+        "message": { "type": "string" }, "recommendation": { "type": "string" }
+      }
+    } },
+    "confusion_matrix": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "type": "integer", "minimum": 0 } } },
+    "detection_mean_s": { "type": ["number", "null"], "minimum": 0 },
+    "asset_health": { "$ref": "#/definitions/score" },
+    "event_hash": { "type": "string", "pattern": "^[0-9a-f]{8}$" },
+    "duration_s": { "type": "number", "minimum": 0 },
+    "completion": { "type": "number", "minimum": 0, "maximum": 1 },
+    "provisional": { "type": "boolean" }
+  },
+  "definitions": { "score": { "type": "number", "minimum": 0, "maximum": 100 } }
+}

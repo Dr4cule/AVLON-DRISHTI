@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0", "id": "broken-signal", "title": "Broken signal", "source": "scripted", "seed": 482908,
+  "description": "A demanding capstone exercise: noisy radar, delayed contacts, mixed movement patterns, and difficult visibility. Keep a complete picture and escalate when the evidence does not support certainty.",
+  "environment": { "terrain": "mountain", "time_of_day": "night", "weather": "rain", "em_conditions": "jammed" },
+  "assets": [{ "id": "A1", "type": "command_post", "pos": [0, 0], "value": 100 }],
+  "sensors": ["radar", "ir", "acoustic", "rf"], "sensor_degradations": [{ "sensor": "radar", "kind": "noise", "start_s": 0, "dur_s": 35 }, { "sensor": "radar", "kind": "dropout", "start_s": 60, "dur_s": 20 }],
+  "roe": { "kinetic_allowed": false, "jam_allowed_over_civilian_area": false, "weapons_free_after_s": null, "warning_required": true, "min_confidence": 0.5 },
+  "actors": [
+    { "id": "C1", "kind": "recon", "allegiance": "hostile", "count": 2, "behavior": "probe_withdraw", "spawn": { "bearing_deg": 35, "range_m": 2500 }, "spawn_s": 0, "speed_mps": 18, "altitude_m": 130, "iff": false, "civilian_area": false },
+    { "id": "C2", "kind": "swarm", "allegiance": "hostile", "count": 3, "behavior": "decoy_and_strike", "spawn": { "bearing_deg": 260, "range_m": 3400 }, "spawn_s": 35, "speed_mps": 25, "altitude_m": 85, "iff": false, "civilian_area": false },
+    { "id": "C3", "kind": "balloon", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 170, "range_m": 1900 }, "spawn_s": 0, "speed_mps": 3, "altitude_m": 70, "iff": false, "civilian_area": false },
+    { "id": "C4", "kind": "friendly_uav", "allegiance": "friendly", "count": 1, "behavior": "patrol_loop", "spawn": { "bearing_deg": 120, "range_m": 2050 }, "spawn_s": 10, "speed_mps": 17, "altitude_m": 140, "iff": true, "civilian_area": false },
+    { "id": "C5", "kind": "clutter", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 300, "range_m": 2600 }, "spawn_s": 0, "speed_mps": 5, "altitude_m": 25, "iff": false, "civilian_area": false }
+  ],
+  "ground_truth_tree": "decision-v1", "difficulty": 5,
+  "difficulty_tags": { "night": 5, "swarm": 4, "degraded_sensors": 5, "distractors": 3, "urban": 0, "speed_pressure": 4, "roe_complexity": 4 }, "duration_s": 240
+}

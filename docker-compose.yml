@@ -1,0 +1,7 @@
+services:
+  avlon-drishti:
+    build: .
+    ports: ["3001:3001"]
+    volumes: ["avlon-drishti-data:/data"]
+    environment: [HOST=0.0.0.0, PORT=3001, DRISHTI_DB=/data/drishti.sqlite]
+volumes: { avlon-drishti-data: {} }

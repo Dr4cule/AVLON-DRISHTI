@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0", "id": "wire-in-the-fog", "title": "Wire in the fog", "source": "scripted", "seed": 482910,
+  "description": "Wire-guided intruders ignore electromagnetic degradation entirely — jamming the spectrum changes nothing for them. With RF degraded, fall back to visual, thermal, and acoustic cross-checks, and respect the civilian-area restraint on electronic effects. (Gameplay parameters only; no real systems modeled.)",
+  "environment": { "terrain": "urban", "time_of_day": "dusk", "weather": "fog", "em_conditions": "high_clutter" },
+  "assets": [{ "id": "A1", "type": "checkpoint", "pos": [0, 0], "value": 100 }],
+  "sensors": ["radar", "eo", "ir", "acoustic", "rf"], "sensor_degradations": [{ "sensor": "rf", "kind": "noise", "start_s": 0, "dur_s": 60 }],
+  "roe": { "kinetic_allowed": false, "jam_allowed_over_civilian_area": false, "weapons_free_after_s": null, "warning_required": true, "min_confidence": 0.55 },
+  "actors": [
+    { "id": "C1", "kind": "fiber_optic", "allegiance": "hostile", "count": 2, "behavior": "approach", "spawn": { "bearing_deg": 300, "range_m": 2800 }, "spawn_s": 0, "speed_mps": 14, "altitude_m": 60, "iff": false, "civilian_area": true },
+    { "id": "C2", "kind": "quadcopter", "allegiance": "hostile", "count": 1, "behavior": "approach", "spawn": { "bearing_deg": 120, "range_m": 3200 }, "spawn_s": 50, "speed_mps": 19, "altitude_m": 90, "iff": false, "civilian_area": false },
+    { "id": "C3", "kind": "balloon", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 200, "range_m": 1800 }, "spawn_s": 0, "speed_mps": 4, "altitude_m": 80, "iff": false, "civilian_area": false },
+    { "id": "C4", "kind": "friendly_uav", "allegiance": "friendly", "count": 1, "behavior": "patrol_loop", "spawn": { "bearing_deg": 40, "range_m": 2100 }, "spawn_s": 10, "speed_mps": 17, "altitude_m": 140, "iff": true, "civilian_area": false }
+  ],
+  "ground_truth_tree": "decision-v1", "difficulty": 4,
+  "difficulty_tags": { "night": 1, "swarm": 0, "degraded_sensors": 4, "distractors": 2, "urban": 3, "speed_pressure": 3, "roe_complexity": 4 }, "duration_s": 210
+}

@@ -1,0 +1,81 @@
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowUpRight, BookOpen, BrainCircuit, CheckCheck, ChevronRight, CircleHelp, Flag, GraduationCap, History, Layers3, LockKeyhole, Pause, Play, Radar, RefreshCw, Settings2, ShieldCheck, UserRound, X } from 'lucide-react';
+import { SCRIPTED_SCENARIOS } from '../sim-core/catalog';
+import type { Scenario, SessionRecord } from '../sim-core/types';
+import { TacticalStation } from './tactical/TacticalStation';
+import { BriefingDialog, ScenarioLibrary } from './scenarios/ScenarioLibrary';
+import { AfterActionReview } from './aar/AfterActionReview';
+import { AdaptivePanel } from './adaptive/AdaptivePanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { InstructorStudio } from './instructor/InstructorStudio';
+import { UnitDashboard } from './instructor/UnitDashboard';
+import { Modal } from './components/Modal';
+import { api, ApiError, type Bootstrap } from './lib/api';
+import { useTraining } from './lib/useTraining';
+import { COPY } from './copy';
+
+type Route = 'mission' | 'scenarios' | 'aar' | 'adaptive' | 'studio' | 'readiness';
+export function App() {
+  const [data, setData] = useState<Bootstrap | null>(null);
+  const [route, setRoute] = useState<Route>('mission');
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [briefing, setBriefing] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [profile, setProfile] = useState(false);
+  const [help, setHelp] = useState(false);
+  const [connectionError, setConnectionError] = useState('');
+  const [connecting, setConnecting] = useState(true);
+  const [toast, setToast] = useState('');
+  const [lowResource, setLowResource] = useState(() => localStorage.getItem('drishti.low-resource') === 'true');
+  const [presentMode, setPresentMode] = useState(() => localStorage.getItem('drishti.present-mode') === 'true');
+  const onCompleted = useCallback((record: SessionRecord) => {
+    setData(previous => previous ? { ...previous, sessions: [record, ...previous.sessions.filter(s => s.id !== record.id)], draft: null } : previous);
+    setSelectedSession(record.id); setRoute('aar'); setToast('Exercise saved locally. Your debrief is ready.');
+  }, []);
+  const training = useTraining(onCompleted);
+  const connect = useCallback(async () => {
+    setConnecting(true); setConnectionError('');
+    try {
+      try { await api.me(); } catch (error) { if (error instanceof ApiError && error.status === 401) await api.login('operator', 'drishti-demo'); else throw error; }
+      const bootstrap = await api.bootstrap(); setData(bootstrap); training.restore(bootstrap);
+    } catch (error) { setConnectionError(error instanceof Error ? error.message : 'Could not connect to the local service.'); }
+    finally { setConnecting(false); }
+  }, [training.restore]);
+  useEffect(() => { void connect(); }, [connect]);
+  useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 4500); return () => clearTimeout(timer); }, [toast]);
+  const navigate = (next: Route) => { if (next !== 'mission') { training.setRunning(false); training.checkpoint(); } setRoute(next); window.scrollTo({ top: 0 }); };
+  const launch = async (scenario: Scenario, mode: 'training' | 'assessment') => { if (await training.start(scenario, mode)) { setRoute('mission'); window.scrollTo({ top: 0 }); } };
+  const nav = [{ id: 'mission' as const, icon: Radar }, { id: 'scenarios' as const, icon: Layers3 }, { id: 'aar' as const, icon: History }, { id: 'adaptive' as const, icon: BrainCircuit }, ...(data?.user.role === 'instructor' ? [{ id: 'studio' as const, icon: GraduationCap }, { id: 'readiness' as const, icon: ShieldCheck }] : [])];
+  return <div className={`app-shell${presentMode ? ' present-mode' : ''}`}>
+    <a className="skip-link" href="#main">Skip to main content</a>
+    <aside className="sidebar"><button className="brand brand-button" onClick={() => navigate('mission')} aria-label="AVLON DRISHTI home"><img src="/mark.svg" alt="" /><div>AVLON DRISHTI<span>AIRSPACE TRAINING SYSTEM</span></div></button><div className="workspace-label">TRAINING WORKSPACE</div>{nav.map(item => <button key={item.id} className={`nav-item ${route === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)} title={COPY.nav[item.id]} aria-current={route === item.id ? 'page' : undefined}><item.icon size={18} />{COPY.nav[item.id]}{route === item.id && <span className="nav-dot" />}</button>)}
+      <div className="sidebar-bottom"><div className="sidebar-utilities"><button className="nav-item" onClick={() => setHelp(true)} title="Station guide"><CircleHelp size={17} />Station guide <span className="utility-badge">?</span></button><button className="nav-item" onClick={() => setSettings(true)} title="Preferences"><Settings2 size={17} />Preferences</button></div><div className="offline-card"><ShieldCheck size={18} /><div>Local by design<span>No cloud. Just capability.</span></div></div><button className="profile profile-button" onClick={() => { training.setRunning(false); setProfile(true); }} title="Switch local profile"><div className="avatar">{data?.user.role === 'instructor' ? 'IN' : 'AR'}</div><div>{data?.user.name ?? 'Training station'}<span>{data?.user.role === 'instructor' ? 'Instructor workspace' : 'Alpha unit · trainee'}</span></div><ChevronRight size={14} /></button></div>
+    </aside>
+    <div className="app-body"><header className="topbar"><div className="breadcrumb">Workspace<span>/</span><strong>{COPY.nav[route]}</strong></div><div className="topbar-right"><div className="topbar-status"><span className="dot" />{connecting ? 'CONNECTING' : connectionError ? 'LOCAL SERVICE OFFLINE' : 'OFFLINE READY'}<span className="topbar-divider" /><span className="topbar-edition">SIH 2026 <span className="version-tag">PROTOTYPE</span></span></div><button className="icon-button" aria-label="Open station guide" title="Station guide" onClick={() => setHelp(true)}><CircleHelp size={17} /></button></div></header>
+      <main id="main" className="main-content">
+        {connectionError && <div className="connection-banner" role="alert"><div><strong>Start the local training service.</strong><p>{connectionError} Run <code>npm run dev</code> from the project folder, then reconnect.</p></div><button className="button secondary small" onClick={() => void connect()}><RefreshCw size={13} />Reconnect</button></div>}
+        {route === 'scenarios' ? <ScenarioLibrary scenarios={data?.scenarios ?? SCRIPTED_SCENARIOS} onLaunch={(s, m) => void launch(s, m)} /> : route === 'aar' && data ? <AfterActionReview sessions={data.sessions} users={data.users} user={data.user} selectedId={selectedSession} onSelect={setSelectedSession} onPractice={() => navigate('adaptive')} /> : route === 'adaptive' ? <><div className="page-heading"><div><div className="eyebrow">PRACTICE YOUR WEAKEST LINK</div><h1>Adaptive intelligence<span className="accent">.</span></h1><p>Evidence-based next exercise, not rote repetition.</p></div></div><AdaptivePanel onLaunch={(s, m) => void launch(s, m)} onBrowse={() => navigate('scenarios')} /></> : route === 'studio' ? <><div className="page-heading"><div><div className="eyebrow">BUILD THE NEXT TEST</div><h1>Scenario studio<span className="accent">.</span></h1><p>Instructor authoring with feasibility guardrails.</p></div></div><InstructorStudio onLaunch={(s, m) => void launch(s, m)} /></> : route === 'readiness' && data ? <UnitDashboard sessions={data.sessions} /> : <>
+          <div className="page-heading"><div><div className="eyebrow">SEE CLEARLY. DECIDE CONFIDENTLY.</div><h1>Train for the unknown<span className="accent">.</span></h1><p>Your decisions. An uncertain airspace. A better-prepared tomorrow.</p></div><div className="heading-actions"><button className="button secondary" onClick={() => { training.setRunning(false); setBriefing(true); }}><BookOpen size={15} />Briefing</button><button className="button primary" disabled={!data || training.busy} onClick={training.toggle}>{training.running ? <Pause size={15} /> : <Play size={15} />}{training.busy ? 'Preparing…' : training.sim.state.ended && training.active ? 'Save & debrief' : training.running ? 'Pause exercise' : training.active ? 'Resume exercise' : 'Start exercise'}</button></div></div>
+          {training.recovered && <div className="recovery-banner"><History size={17} /><div><strong>Your exercise has been recovered.</strong><span>The deterministic engine restored your last recorded tick and decisions.</span></div><button className="button secondary small" onClick={training.toggle}>Resume exercise <Play size={12} /></button></div>}
+          <div className="exercise-strip"><div className="exercise-strip-title"><Flag size={15} /><span>{training.active ? 'ACTIVE EXERCISE' : 'READY TO TRAIN'}</span><strong>{training.sim.scenario.title}</strong><span className="tag amber">LEVEL {training.sim.scenario.difficulty}</span></div><div><span className="mono muted">{training.mode.toUpperCase()} MODE</span><button className="button ghost small" onClick={() => navigate('scenarios')}>Change <ChevronRight size={13} /></button></div></div>
+          <ErrorBoundary area="tactical-station">
+          <TacticalStation sim={training.sim} active={training.active} running={training.running} mode={training.mode} lowResource={lowResource} onAction={training.act} onToggle={() => { if (data && !training.busy) training.toggle(); }} message={training.message} onBriefing={() => { training.setRunning(false); setBriefing(true); }} />
+          </ErrorBoundary>
+          <div className="exercise-bottom-actions"><span className="mono muted">SPACE pause / resume · A acknowledge · 1–4 classify</span><div><label className="simulation-speed">PACE<select aria-label="Simulation speed" value={training.speed} disabled={training.mode === 'assessment'} onChange={e => training.setSpeed(Number(e.target.value))}><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label><button className="button secondary small" disabled={!training.active || training.busy} onClick={() => void training.finish()}>End & debrief <ArrowUpRight size={14} /></button></div></div>
+          <div className="mission-note"><span><ShieldCheck size={15} /><strong>Decisions over reflexes.</strong> Confidence is evidence quality—not allegiance.</span><button onClick={() => navigate('aar')}>Explore a debrief <ArrowRightIcon /></button></div>
+        </>}
+      </main><footer className="app-footer"><span><span className="dot" />{training.syncState === 'pending' ? 'BROWSER JOURNAL · SYNC PENDING' : training.syncState === 'saving' ? 'SAVING LOCAL CHECKPOINT' : 'ALL SYSTEMS LOCAL'}</span><span>AVLON DRISHTI v1.0 <span className="footer-separator">/</span> SIMULATED ENVIRONMENT</span></footer>
+    </div>
+    {briefing && <BriefingDialog scenario={training.sim.scenario} current={training.active} onClose={() => setBriefing(false)} onLaunch={mode => { setBriefing(false); void launch(training.sim.scenario, mode); }} />}
+    {settings && <Modal title="Your station, your way." eyebrow="PREFERENCES" onClose={() => setSettings(false)}><div className="modal-body"><label className="settings-toggle"><div><strong>Low-resource rendering</strong><span>Reduce visual animation to 10 FPS. Simulation decisions still advance at a fixed 250 ms step.</span></div><input type="checkbox" checked={lowResource} onChange={e => { setLowResource(e.target.checked); localStorage.setItem('drishti.low-resource', String(e.target.checked)); }} /></label><label className="settings-toggle"><div><strong>Present mode</strong><span>Enlarge tables, timelines, and evidence text for venue projectors. Simulation behavior is unchanged.</span></div><input type="checkbox" checked={presentMode} onChange={e => { setPresentMode(e.target.checked); localStorage.setItem('drishti.present-mode', String(e.target.checked)); }} /></label><div className="settings-info"><ShieldCheck size={19} /><div><h4>Private by design</h4><p>Records stay in the local SQLite database. Fonts, maps, and learning algorithms are bundled. No telemetry or cloud model calls.</p></div></div><div className="settings-info"><CheckCheck size={19} /><div><h4>Shape-coded contacts</h4><p>Diamond: unknown. Triangle: hostile. Square: friendly. Circle: benign. The register and keyboard controls provide a second way to interact with the map.</p></div></div><button className="button primary full-width" onClick={() => setSettings(false)}>Save preferences</button></div></Modal>}
+    {help && <Modal title="A clearer decision in four steps." eyebrow="STATION GUIDE" onClose={() => setHelp(false)}><div className="modal-body"><div className="guide-steps">{[['Observe the picture', 'Start an exercise. Select a contact and compare radar, visual, thermal, and bearing cues.'], ['Acknowledge & classify', 'Press A to acknowledge. Record an allegiance and type. Unknown is a valid hypothesis when evidence is limited.'], ['Choose & explain', 'Check the visible exercise rules. Choose an abstract response and a reason, then record it.'], ['Replay & improve', 'End the exercise to reveal the decision tree and ground truth. Inspect a mistake at its exact timestamp.']].map(([title, text], i) => <div key={title}><span>{String(i + 1).padStart(2, '0')}</span><div><h3>{title}</h3><p>{text}</p></div></div>)}</div><div className="inline-note amber"><ShieldCheck size={15} /> All terrain, sensors, and counter-measures use fictional gameplay models.</div><button className="button primary full-width" onClick={() => setHelp(false)}>Ready to train <Play size={14} /></button></div></Modal>}
+    {profile && data && <ProfileDialog data={data} onClose={() => setProfile(false)} onSignIn={async (id, password) => { if (training.active && !await training.finish()) throw new Error('Save the active exercise before switching profiles.'); await api.login(id, password); const next = await api.bootstrap(); setData(next); training.restore(next); setProfile(false); setRoute('mission'); setToast(`Signed in as ${next.user.name}.`); }} />}
+    {toast && <div className="toast" role="status"><CheckCheck size={16} /><span>{toast}</span><button className="icon-button" aria-label="Dismiss notification" onClick={() => setToast('')}><X size={13} /></button></div>}
+  </div>;
+}
+function ArrowRightIcon() { return <ChevronRight size={13} />; }
+function ProfileDialog({ data, onClose, onSignIn }: { data: Bootstrap; onClose: () => void; onSignIn: (id: string, password: string) => Promise<void> }) {
+  const [id, setId] = useState(data.user.role === 'trainee' ? 'instructor' : 'operator');
+  const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  return <Modal title="Switch training profile" eyebrow="LOCAL STATION SIGN-IN" onClose={onClose}><form className="modal-body" onSubmit={async event => { event.preventDefault(); setBusy(true); setError(''); try { await onSignIn(id, password); } catch (e) { setError(e instanceof Error ? e.message : 'Sign-in failed.'); } finally { setBusy(false); } }}><p className="briefing-description">Instructor sign-in unlocks scenario authoring, assignments, and unit analytics. Each trainee’s decisions remain attached to their own profile.</p><label className="form-field profile-field"><span>PROFILE</span><select aria-label="Local profile" value={id} onChange={e => setId(e.target.value)}>{data.users.map(u => <option key={u.id} value={u.id}>{u.name} · {u.role}{u.synthetic ? ' · sample profile' : ''}</option>)}</select></label><label className="form-field profile-field"><span>LOCAL PASSWORD</span><input type="password" autoComplete="current-password" aria-label="Local password" placeholder="Enter the station password" value={password} onChange={e => setPassword(e.target.value)} required /></label>{error && <p className="error-message" role="alert">{error}</p>}<button className="button primary full-width" type="submit" disabled={busy}><LockKeyhole size={14} />{busy ? 'Signing in…' : 'Sign in to profile'}</button><p className="fine-print">Demo station password: <code>drishti-demo</code>. An instructor password can be configured at first launch using the installation guide.</p></form></Modal>;
+}

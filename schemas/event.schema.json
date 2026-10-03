@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "drishti/event/1.0",
+  "title": "Immutable simulation event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["seq", "tick", "t_ms", "type", "actor_id", "payload"],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 0 },
+    "tick": { "type": "integer", "minimum": 0 },
+    "t_ms": { "type": "integer", "minimum": 0, "multipleOf": 250 },
+    "type": { "enum": ["ScenarioStarted", "ActorSpawned", "FirstDetectable", "SensorDetection", "SensorStatusChanged", "TrackAcknowledged", "TrackClassified", "ResponseOrdered", "ResponseRejected", "ActorResolved", "AssetDamaged", "ActorExited", "ScenarioEnded"] },
+    "actor_id": { "type": ["string", "null"] },
+    "payload": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean", "null", "array"] } }
+  }
+}

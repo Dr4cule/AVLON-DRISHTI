@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0", "id": "urban-echo", "title": "Urban echo", "source": "scripted", "seed": 482902,
+  "description": "Buildings fragment the sensor picture around a fictional city checkpoint. Separate civilian activity from a closing contact and apply the warning ladder.",
+  "environment": { "terrain": "urban", "time_of_day": "day", "weather": "glare", "em_conditions": "clean" },
+  "assets": [{ "id": "A1", "type": "checkpoint", "pos": [0, 0], "value": 100 }],
+  "sensors": ["radar", "eo", "ir", "rf"], "sensor_degradations": [],
+  "roe": { "kinetic_allowed": false, "jam_allowed_over_civilian_area": false, "weapons_free_after_s": null, "warning_required": true, "min_confidence": 0.55 },
+  "actors": [
+    { "id": "C1", "kind": "quadcopter", "allegiance": "hostile", "count": 1, "behavior": "approach", "spawn": { "bearing_deg": 50, "range_m": 3000 }, "spawn_s": 0, "speed_mps": 19, "altitude_m": 70, "iff": false, "civilian_area": true },
+    { "id": "C2", "kind": "balloon", "allegiance": "benign", "count": 1, "behavior": "random_walk", "spawn": { "bearing_deg": 200, "range_m": 1700 }, "spawn_s": 0, "speed_mps": 3, "altitude_m": 90, "iff": false, "civilian_area": true },
+    { "id": "C3", "kind": "friendly_uav", "allegiance": "friendly", "count": 1, "behavior": "patrol_loop", "spawn": { "bearing_deg": 310, "range_m": 2200 }, "spawn_s": 8, "speed_mps": 16, "altitude_m": 130, "iff": true, "civilian_area": false }
+  ],
+  "ground_truth_tree": "decision-v1", "difficulty": 2,
+  "difficulty_tags": { "night": 0, "swarm": 0, "degraded_sensors": 1, "distractors": 2, "urban": 3, "speed_pressure": 1, "roe_complexity": 3 }, "duration_s": 180
+}

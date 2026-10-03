@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "drishti/action/1.0",
+  "title": "Trainee input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tick", "actor_id", "type"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0, "maximum": 3600 },
+    "actor_id": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "type": { "enum": ["acknowledge", "classify", "respond"] },
+    "classification": { "enum": ["hostile", "friendly", "benign", "unknown"] },
+    "drone_type": { "enum": ["quadcopter", "fixed_wing", "fast_mover", "recon", "swarm", "bird_flock", "kite", "balloon", "helicopter", "friendly_uav", "clutter", "fiber_optic", "unknown"] },
+    "response": { "enum": ["observe", "warn", "electronic_jam", "spoof_redirect", "net_capture", "kinetic_intercept", "escalate_to_command"] },
+    "reason": { "enum": ["insufficient_evidence", "protect_asset", "positive_identification", "friendly_iff", "benign_pattern", "roe_restriction"] }
+  },
+  "allOf": [
+    { "if": { "properties": { "type": { "const": "classify" } } }, "then": { "required": ["classification", "drone_type"] } },
+    { "if": { "properties": { "type": { "const": "respond" } } }, "then": { "required": ["response", "reason"] } }
+  ]
+}

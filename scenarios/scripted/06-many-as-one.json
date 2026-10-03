@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0", "id": "many-as-one", "title": "Many as one", "source": "scripted", "seed": 482906,
+  "description": "A small correlated group shares the sky with routine traffic. Build awareness across contacts while maintaining a deliberate classification and response rhythm.",
+  "environment": { "terrain": "rural", "time_of_day": "dusk", "weather": "clear", "em_conditions": "clean" },
+  "assets": [{ "id": "A1", "type": "convoy", "pos": [0, 0], "value": 100 }],
+  "sensors": ["radar", "eo", "ir", "acoustic", "rf"], "sensor_degradations": [],
+  "roe": { "kinetic_allowed": false, "jam_allowed_over_civilian_area": false, "weapons_free_after_s": null, "warning_required": false, "min_confidence": 0.55 },
+  "actors": [
+    { "id": "C1", "kind": "swarm", "allegiance": "hostile", "count": 4, "behavior": "flocking", "spawn": { "bearing_deg": 55, "range_m": 3350 }, "spawn_s": 0, "speed_mps": 22, "altitude_m": 100, "iff": false, "civilian_area": false },
+    { "id": "C2", "kind": "helicopter", "allegiance": "benign", "count": 1, "behavior": "patrol_loop", "spawn": { "bearing_deg": 240, "range_m": 2400 }, "spawn_s": 0, "speed_mps": 28, "altitude_m": 300, "iff": false, "civilian_area": false },
+    { "id": "C3", "kind": "friendly_uav", "allegiance": "friendly", "count": 1, "behavior": "patrol_loop", "spawn": { "bearing_deg": 160, "range_m": 1700 }, "spawn_s": 5, "speed_mps": 15, "altitude_m": 120, "iff": true, "civilian_area": false }
+  ],
+  "ground_truth_tree": "decision-v1", "difficulty": 3,
+  "difficulty_tags": { "night": 1, "swarm": 3, "degraded_sensors": 0, "distractors": 2, "urban": 0, "speed_pressure": 2, "roe_complexity": 2 }, "duration_s": 180
+}

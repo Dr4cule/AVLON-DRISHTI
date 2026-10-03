@@ -8,7 +8,7 @@ The raw dataset is never written to disk; rerunning the command reproduces these
 - Split: **scenario-level** 70/10/20 by scenario-ID hash — validation consists entirely of track snapshots from simulated scenarios that are absent from the training set. This measures **generalization to unseen simulated scenarios**, not real-world generalization.
 - Labels: ground-truth allegiance/kind, except tracks younger than 6 s or with fewer than 2 fresh sensor readings are labeled `unknown_uav` (insufficient evidence must mean "unknown").
 - Training: seeded full-batch gradient descent, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, inverse-frequency class weights (capped at 6), 400 epochs.
-- Dataset generation took 3.2 s on a laptop CPU.
+- Dataset generation took 2.8 s on a laptop CPU.
 
 ## Model comparison (identical splits, identical test set)
 
@@ -92,4 +92,4 @@ Note on the heuristic: it re-implements parts of the labeling rule itself (notab
 
 - Seed 482913 · scenarios 230 (train 161 / calib 23 / test 46) · snapshots train 10032 / calib 1869 / test 2973
 - Config: epochs 400, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, class-weight cap 6, snapshot ages 1/3/4/6/10/20/35/60/90/150s
-- Feature version 2 · model version 2 · git commit 0fe460b8a0c3a6a9abb7c0e1de0c5c086f2bd3bc
+- Feature version 2 · model version 2 · git commit 283360b61f055bbde0ef3e0c7547783f0f0d9279

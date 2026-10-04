@@ -40,4 +40,14 @@ describe('scenario curriculum, fairness and variety', () => {
     expect(() => generateScenario({ seed: -1, difficulty: 2 })).toThrow();
     expect(() => generateScenario({ seed: 12, difficulty: 8 })).toThrow();
   });
+  it('treats constrained dirty-EM exercises as degraded and fingerprints loadout details', () => {
+    const { scenario } = generateScenario({ seed: 322, difficulty: 2, constraints: { em_conditions: 'jammed' } });
+    expect(scenario.difficulty_tags.degraded_sensors).toBeGreaterThan(0);
+    expect(scenario.sensor_degradations.length).toBeGreaterThan(0);
+    const a = generateScenario({ seed: 323, difficulty: 2 }).scenario;
+    const faster = { ...a, actors: a.actors.map(x => ({ ...x, speed_mps: x.speed_mps + 20 })) };
+    expect(fingerprint(faster)).not.toBe(fingerprint(a));
+    const noIff = { ...a, actors: a.actors.map(x => ({ ...x, iff: false })) };
+    if (a.actors.some(x => x.iff)) expect(fingerprint(noIff)).not.toBe(fingerprint(a));
+  });
 });

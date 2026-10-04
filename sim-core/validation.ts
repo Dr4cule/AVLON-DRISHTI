@@ -17,6 +17,13 @@ export function scenarioErrors(value: unknown): string[] {
   const errors: string[] = [];
   if (new Set(s.actors.map(a => a.id)).size !== s.actors.length) errors.push('Actor IDs must be unique.');
   if (new Set(s.assets.map(a => a.id)).size !== s.assets.length) errors.push('Asset IDs must be unique.');
+  // The engine defends exactly one protected asset (movement, impact, and health all
+  // resolve against assets[0]); multi-asset scenarios would silently mis-score.
+  if (s.assets.length !== 1) errors.push('A scenario defends exactly one protected asset.');
+  // Expanded contact IDs must also be unique: a group actor `A` with count 2 expands to
+  // `A-1`, `A-2`, which would silently collide with a literal actor `A-1` (mirror of world.ts).
+  const expanded = s.actors.flatMap(a => a.count === 1 ? [a.id] : Array.from({ length: a.count }, (_, i) => `${a.id}-${i + 1}`));
+  if (new Set(expanded).size !== expanded.length) errors.push('Expanded contact IDs collide: a group actor and a literal actor resolve to the same contact ID.');
   if (s.actors.reduce((n, a) => n + a.count, 0) > 40) errors.push('A scenario supports at most 40 expanded contacts.');
   for (const a of s.actors) {
     if (a.spawn_s > s.duration_s - 20) errors.push(`${a.id}: allow at least 20 seconds after spawn.`);

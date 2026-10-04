@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRight, Plus, Save, Trash2, Upload } from 'lucide-react';
 import type { ActorSpec, Scenario } from '../../sim-core/types';
 import { assertScenario, scenarioErrors } from '../../sim-core/validation';
@@ -17,14 +17,21 @@ const blank: Scenario = {
   difficulty_tags: { night: 0, swarm: 0, degraded_sensors: 0, distractors: 1, urban: 0, speed_pressure: 1, roe_complexity: 2 }, duration_s: 180,
 };
 
+/** Next contact ID from the highest existing C-number: deleting C2 from [C1,C2,C3] yields C4, never a duplicate C3. */
+export function nextContactId(ids: string[]): string {
+  const next = ids.reduce((m, id) => { const k = Number(/^C(\d+)$/.exec(id)?.[1]); return Number.isFinite(k) ? Math.max(m, k) : m; }, 0) + 1;
+  return `C${next}`;
+}
+
 export function InstructorStudio({ onLaunch }: { onLaunch: (s: Scenario, mode: 'training' | 'assessment') => void }) {
   const [scenario, setScenario] = useState<Scenario>(blank);
   const [msg, setMsg] = useState('');
   const [assignMsg, setAssignMsg] = useState('');
   const errors = scenarioErrors(scenario);
-  const preview = (() => { try { return new Simulation(scenario); } catch { return null; } })();
+  const preview = useMemo(() => { try { return new Simulation(scenario); } catch { return null; } }, [scenario]);
   const set = (patch: Partial<Scenario>) => setScenario(s => ({ ...s, ...patch }));
-  const addActor = () => setScenario(s => ({ ...s, actors: [...s.actors, { id: `C${s.actors.length + 1}`, kind: 'quadcopter', allegiance: 'hostile', count: 1, behavior: 'approach', spawn: { bearing_deg: 90, range_m: 3000 }, spawn_s: 0, speed_mps: 18, altitude_m: 100, iff: false, civilian_area: false } as ActorSpec] }));
+  // Next ID from the highest existing C-number, so deleting an actor never reuses an ID.
+  const addActor = () => setScenario(s => ({ ...s, actors: [...s.actors, { id: nextContactId(s.actors.map(a => a.id)), kind: 'quadcopter', allegiance: 'hostile', count: 1, behavior: 'approach', spawn: { bearing_deg: 90, range_m: 3000 }, spawn_s: 0, speed_mps: 18, altitude_m: 100, iff: false, civilian_area: false } as ActorSpec] }));
   const save = async (assign = false) => {
     setMsg('');
     if (errors.length) { setMsg(errors.join(' ')); return; }

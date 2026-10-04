@@ -49,4 +49,20 @@ describe('deterministic simulation seam', () => {
     expect(Array.from({ length: 100 }, () => a.next())).toEqual(Array.from({ length: 100 }, () => b.next()));
     expect(() => assertReport(scoreSimulation(replay(scenario, [], 80)))).not.toThrow();
   });
+  it('rejects expanded contact-ID collisions between group and literal actors', () => {
+    const colliding = {
+      ...scenario,
+      actors: [
+        { ...scenario.actors[0], id: 'A', count: 2 },
+        { ...scenario.actors[0], id: 'A-1', count: 1 },
+      ],
+    };
+    expect(scenarioErrors(colliding).some(e => e.includes('collide'))).toBe(true);
+  });
+  it('requires exactly one protected asset and checks replay engine versions', () => {
+    const two = { ...scenario, assets: [scenario.assets[0], { ...scenario.assets[0], id: 'A2' }] };
+    expect(scenarioErrors(two).some(e => e.includes('exactly one protected asset'))).toBe(true);
+    expect(() => replay(scenario, [], 10, true, '9.9.9')).toThrow(/engine/);
+    expect(() => replay(scenario, [], 10, true, '1.0.0')).not.toThrow();
+  });
 });

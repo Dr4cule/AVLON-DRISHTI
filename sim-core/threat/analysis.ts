@@ -89,6 +89,7 @@ export function analyzeSession(record: SessionRecord, history: SessionRecord[]):
       record.actions.filter(a => a.tick <= tick),
       tick,
       false,
+      record.engine_version,
     );
     const track = sim.state.tracks[mistake.actor_id];
     if (!track) return analysis;

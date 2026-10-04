@@ -16,6 +16,11 @@ import { generateScenario } from '../sim-core/generator';
 import { hashText, quantize } from '../sim-core/prng';
 
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
+/** Schema failures are client errors with a fixed message: Ajv internals never reach the API. */
+function assertScenarioRequest(value: unknown): asserts value is Scenario {
+  try { assertScenario(value); }
+  catch { throw new HttpError(400, 'Scenario does not match the station schema.'); }
+}
 const serialize = (value: unknown) => JSON.stringify(value);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 interface SessionRow { id: string; user_id: string; scenario_json: string; mode: 'training' | 'assessment'; started_at: string; ended_at: string | null; end_tick: number; actions_json: string; engine_version: string; synthetic: number; report_json: string | null }
@@ -40,7 +45,7 @@ export class Store {
       CREATE TRIGGER IF NOT EXISTS immutable_event_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'Event log is append-only'); END;
       CREATE TRIGGER IF NOT EXISTS immutable_event_delete BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT,'Event log is append-only'); END;
     `);
-    this.seedUsers();
+    this.seedUsers(includeDemo);
     const insertScenario = this.db.prepare('INSERT OR IGNORE INTO scenarios(id,title,json,source,seed) VALUES(?,?,?,?,?)');
     for (const s of SCRIPTED_SCENARIOS) insertScenario.run(s.id, s.title, serialize(s), s.source, s.seed);
     if (includeDemo && !this.db.prepare("SELECT id FROM sessions WHERE synthetic=1 LIMIT 1").get()) this.seedDemo();
@@ -51,12 +56,20 @@ export class Store {
     try { const result = fn(); this.db.exec('COMMIT'); return result; }
     catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
-  private seedUsers() {
+  private seedUsers(includeDemo: boolean) {
     this.db.prepare('INSERT OR IGNORE INTO units VALUES(?,?)').run('unit-alpha', 'Alpha training unit');
     this.db.prepare('INSERT OR IGNORE INTO units VALUES(?,?)').run('demo-unit', 'Example unit · synthetic');
-    const users: User[] = [{ id: 'operator', name: 'Aarav Rao', role: 'trainee', unit_id: 'unit-alpha', synthetic: false }, { id: 'instructor', name: 'Station instructor', role: 'instructor', unit_id: 'unit-alpha', synthetic: false }, ...DEMO_USERS];
+    const users: User[] = [{ id: 'operator', name: 'Aarav Rao', role: 'trainee', unit_id: 'unit-alpha', synthetic: false }, { id: 'instructor', name: 'Station instructor', role: 'instructor', unit_id: 'unit-alpha', synthetic: false }, ...(includeDemo ? DEMO_USERS : [])];
     for (const user of users) {
-      if (this.db.prepare('SELECT id FROM users WHERE id=?').get(user.id)) continue;
+      if (this.db.prepare('SELECT id FROM users WHERE id=?').get(user.id)) {
+        // Shared stations rotate the instructor password via env on every boot, fresh DB or not.
+        if (user.id === 'instructor' && process.env.DRISHTI_INSTRUCTOR_PASSWORD) {
+          const salt = randomBytes(16).toString('hex');
+          const hash = `${salt}:${scryptSync(process.env.DRISHTI_INSTRUCTOR_PASSWORD, salt, 32).toString('hex')}`;
+          this.db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hash, user.id);
+        }
+        continue;
+      }
       const salt = randomBytes(16).toString('hex');
       const password = user.id === 'instructor' ? process.env.DRISHTI_INSTRUCTOR_PASSWORD ?? 'drishti-demo' : 'drishti-demo';
       const hash = `${salt}:${scryptSync(password, salt, 32).toString('hex')}`;
@@ -67,10 +80,20 @@ export class Store {
     return this.db.prepare('SELECT id,name,role,unit_id,synthetic FROM users ORDER BY synthetic,id').all().map(r => ({ ...r, synthetic: !!r.synthetic })) as unknown as User[];
   }
   login(id: string, password: string): { token: string; user: User } {
-    const row = this.db.prepare('SELECT * FROM users WHERE id=?').get(id);
-    if (!row || typeof password !== 'string' || password.length > 256) throw new HttpError(401, 'Incorrect account or password.');
-    const [salt, hash] = String(row.password_hash).split(':');
-    if (!timingSafeEqual(scryptSync(password, salt, 32), Buffer.from(hash, 'hex'))) throw new HttpError(401, 'Incorrect account or password.');
+    const row = this.db.prepare('SELECT * FROM users WHERE id=?').get(id) as unknown as { password_hash?: unknown } | undefined;
+    // Fixed-shape KDF on every attempt: missing accounts and malformed hashes cost the same
+    // CPU as real verification, and every failure collapses into one identical 401.
+    const parts = typeof row?.password_hash === 'string' ? row.password_hash.split(':') : [];
+    const wellFormed = parts.length === 2 && /^[0-9a-f]{32}$/i.test(parts[0]) && /^[0-9a-f]{64}$/i.test(parts[1]);
+    const secret = typeof password === 'string' && password.length <= 256 ? password : '';
+    // Exactly one KDF per attempt — real salt for well-formed accounts, fixed decoy
+    // salt otherwise — so timing reveals nothing about account existence or hash health.
+    let ok = false;
+    try {
+      const derived = scryptSync(secret, wellFormed ? parts[0] : 'drishti-login-decoy-salt', 32);
+      ok = wellFormed && secret.length > 0 && timingSafeEqual(derived, Buffer.from(parts[1], 'hex'));
+    } catch { ok = false; }
+    if (!row || !ok) throw new HttpError(401, 'Incorrect account or password.');
     const token = randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
     this.db.prepare('DELETE FROM auth_sessions WHERE expires_at < ?').run(new Date().toISOString());
@@ -113,7 +136,7 @@ export class Store {
     return row ? { id: row.id, user_id: row.user_id, scenario: JSON.parse(row.scenario_json), mode: row.mode, started_at: row.started_at, tick: row.end_tick, actions: JSON.parse(row.actions_json), engine_version: row.engine_version } : null;
   }
   start(user: User, input: unknown, mode: string): RunJournal {
-    assertScenario(input);
+    assertScenarioRequest(input);
     if (!['training', 'assessment'].includes(mode)) throw new HttpError(400, 'Choose training or assessment mode.');
     if (this.draft(user)) throw new HttpError(409, 'Finish or review your active exercise before starting another.');
     let scenario = structuredClone(input);
@@ -156,21 +179,38 @@ export class Store {
   }
   finish(id: string, user: User, actions: unknown, tick: unknown): SessionRecord {
     const row = this.sessionRow(id); this.authorize(row, user, true);
-    if (row.ended_at) return this.toRecord(row);
+    if (row.ended_at) return this.refinished(row, actions);
     const sim = this.validatedReplay(row, actions, tick, true);
     const report = scoreSimulation(sim); assertReport(report);
-    this.transaction(() => {
-      this.appendEvents(id, sim.events);
-      this.db.prepare('UPDATE sessions SET ended_at=?,end_tick=?,actions_json=? WHERE id=?').run(new Date().toISOString(), sim.state.tick, serialize(sim.actions), id);
-      this.db.prepare('INSERT INTO score_reports VALUES(?,?)').run(id, serialize(report));
-      if (!row.synthetic) {
-        // Recompute the full skill profile from all real sessions (cheap: small n)
-        // and persist it, so skill_state is the source of truth, not a dead table.
-        const profile = profileFromSessions(user.id, this.sessions(user));
-        this.writeSkills(user.id, profile.skills);
+    try {
+      return this.transaction(() => {
+        // Re-check inside the write transaction: a concurrent finish may have landed first.
+        const fresh = this.sessionRow(id);
+        if (fresh.ended_at) return this.refinished(fresh, actions);
+        this.appendEvents(id, sim.events);
+        this.db.prepare('UPDATE sessions SET ended_at=?,end_tick=?,actions_json=? WHERE id=?').run(new Date().toISOString(), sim.state.tick, serialize(sim.actions), id);
+        this.db.prepare('INSERT INTO score_reports VALUES(?,?)').run(id, serialize(report));
+        if (!row.synthetic) {
+          // Recompute the full skill profile from all real sessions (cheap: small n)
+          // and persist it, so skill_state is the source of truth, not a dead table.
+          const profile = profileFromSessions(user.id, this.sessions(user));
+          this.writeSkills(user.id, profile.skills);
+        }
+        return this.session(id, user);
+      });
+    } catch (error) {
+      // A lost write race still converges on the winner's record instead of a raw constraint error.
+      if (error instanceof Error && /PRIMARY KEY|UNIQUE constraint/i.test(error.message)) {
+        const fresh = this.sessionRow(id);
+        if (fresh.ended_at) return this.refinished(fresh, actions);
       }
-    });
-    return this.session(id, user);
+      throw error;
+    }
+  }
+  /** Idempotent refinish: identical payload returns the record, anything else is a 409. */
+  private refinished(row: SessionRow, actions: unknown): SessionRecord {
+    if (serialize(actions) !== row.actions_json) throw new HttpError(409, 'This exercise was already recorded with different decisions.');
+    return this.toRecord(row);
   }
   private readSkills(userId: string): Record<Dimension, SkillState> | null {
     const rows = this.db.prepare('SELECT dimension,a,b,sessions FROM skill_state WHERE user_id=?').all(userId);
@@ -209,7 +249,7 @@ export class Store {
     const sessions = this.sessions(user);
     const { profile } = this.skillProfile(user.id, sessions);
     const calibration = calibrateDifficulty(sessions);
-    const recent = sessions.slice(0, 12).map(s => { try { return fingerprint(s.scenario); } catch { return ''; } });
+    const recent = sessions.filter(s => !s.synthetic).slice(0, 12).map(s => { try { return fingerprint(s.scenario); } catch { return ''; } });
     const rec = recommendNext(profile, calibration, recent);
     // Deterministic fallback seed derived from user history — same state always
     // yields the same recommendation; no wall-clock leaks into the engine.
@@ -230,14 +270,16 @@ export class Store {
     });
     // Skill movement since the previous session, for the "learning update" moment.
     // Computed by the same update rule with and without the latest session.
-    const ordered = [...sessions].sort((a, b) => a.started_at.localeCompare(b.started_at));
+    // Real sessions are isolated first: slicing before filtering would drop the
+    // wrong session whenever a synthetic or provisional run sits at either end.
+    const orderedReal = sessions.filter(s => !s.synthetic && !s.report.provisional).sort((a, b) => a.started_at.localeCompare(b.started_at));
     const skillDeltas =
-      ordered.length === 0
+      orderedReal.length === 0
         ? []
         : DIMENSIONS.map(dimension => {
             const before = profileFromSessions(
               user.id,
-              ordered.slice(0, -1).filter(s => !s.synthetic && !s.report.provisional),
+              orderedReal.slice(0, -1),
             ).skills[dimension].mean;
             const after = profile.skills[dimension].mean;
             return { dimension, before, after };
@@ -267,16 +309,18 @@ export class Store {
   }
   saveInstructorScenario(instructor: User, scenario: unknown) {
     if (instructor.role !== 'instructor') throw new HttpError(403, 'Instructor sign-in required.');
-    assertScenario(scenario);
+    assertScenarioRequest(scenario);
     const s = scenario as Scenario;
     if (!runBaseline(s).report.passed) throw new HttpError(400, 'This exercise did not pass the delayed-baseline feasibility check.');
+    const existing = this.db.prepare('SELECT source FROM scenarios WHERE id=?').get(s.id) as unknown as { source: string } | undefined;
+    if (existing && existing.source !== 'instructor') throw new HttpError(409, `Exercise '${s.id}' is a built-in scenario and cannot be overwritten. Save under a new id.`);
     this.db.prepare('INSERT INTO scenarios(id,title,json,source,seed) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,json=excluded.json,source=excluded.source,seed=excluded.seed').run(s.id, s.title, serialize(s), 'instructor', s.seed);
     return { id: s.id };
   }
   createAssignment(instructor: User, unit_id: string, scenario: unknown, due_at?: string) {
     if (instructor.role !== 'instructor') throw new HttpError(403, 'Instructor sign-in required.');
     this.assertUnit(unit_id);
-    assertScenario(scenario);
+    assertScenarioRequest(scenario);
     const s = scenario as Scenario;
     if (!runBaseline(s).report.passed) throw new HttpError(400, 'This exercise did not pass the delayed-baseline feasibility check.');
     const id = randomUUID();
@@ -293,7 +337,7 @@ export class Store {
     const due_at = patch.due_at === undefined ? (row.due_at as string | null) : this.assertDueAt(patch.due_at);
     let scenario_json = String(row.scenario_json);
     if (patch.scenario !== undefined) {
-      assertScenario(patch.scenario);
+      assertScenarioRequest(patch.scenario);
       if (!runBaseline(patch.scenario as Scenario).report.passed) throw new HttpError(400, 'This exercise did not pass the delayed-baseline feasibility check.');
       scenario_json = serialize(patch.scenario);
     }
@@ -322,7 +366,7 @@ export class Store {
       e.sessions += 1; e.last = s.started_at > e.last ? s.started_at : e.last;
       byUser[s.user_id] = e;
     }
-    return { users: this.users(), byUser, total: sessions.length };
+    return { users: this.users(), byUser, total: sessions.filter(s => !s.synthetic).length, synthetic: sessions.filter(s => s.synthetic).length };
   }
   private seedDemo() {
     this.transaction(() => {

@@ -68,8 +68,8 @@ export function AiAnalysis({
                 <p>
                   At {formatTime((analysis.mistakeTick ?? 0) / 4)} the on-device model estimated{' '}
                   <strong>{analysis.modelView.predictedClass.replace(/_/g, ' ')}</strong> at{' '}
-                  {Math.round(analysis.modelView.confidence * 100)}% ({analysis.modelView.band}{' '}
-                  uncertainty)
+                  <strong>MODEL CONFIDENCE {Math.round(analysis.modelView.confidence * 100)}%</strong> ({analysis.modelView.band}{' '}
+                  uncertainty, a calibrated model probability — not a physical probability)
                   {analysis.modelView.topEvidence
                     .map(e => `${e.name} ${e.value >= 0 ? '+' : ''}${e.value.toFixed(2)}`)
                     .join(' · ')}

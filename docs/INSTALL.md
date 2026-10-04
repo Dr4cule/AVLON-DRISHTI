@@ -14,7 +14,7 @@ npm run dev
 npm run build
 npm start  # serves dist/web + API on 127.0.0.1:3001
 ```
-Env: `PORT HOST DRISHTI_ROOT DRISHTI_DB DRISHTI_DEMO=1/0 DRISHTI_INSTRUCTOR_PASSWORD`.
+Env: `PORT HOST DRISHTI_ROOT DRISHTI_DB DRISHTI_DEMO=1/0` (`0`, `false`, `no`, `off` all disable demo data) `DRISHTI_INSTRUCTOR_PASSWORD`.
 Demo passwords default `drishti-demo`; set instructor password via env on shared stations.
 
 ## Docker

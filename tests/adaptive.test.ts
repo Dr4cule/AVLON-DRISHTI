@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIMENSIONS } from '../sim-core/types';
 import { calibrateDifficulty, emptySkills, profileFromSessions, recommendNext, updateSkills, weaknessRecommendations } from '../sim-core/adaptive';
+import type { AdaptiveProfile } from '../sim-core/adaptive';
 import { runBaseline } from '../sim-core/baseline';
 import { SCRIPTED_SCENARIOS } from '../sim-core/catalog';
 import { scoreSimulation } from '../sim-core/scoring';
@@ -51,5 +52,16 @@ describe('adaptive skill model', () => {
     const cal = calibrateDifficulty([fakeSession('s1', 0, 90) as any, fakeSession('s2', 0, 20, false, true) as any]);
     expect(cal[1].attempts).toBe(1);
     expect(replay).toBeDefined();
+  });
+  it('maps skill across the full difficulty range', () => {
+    const cal: Record<number, { success_rate: number | null }> = { 1: { success_rate: null }, 2: { success_rate: null }, 3: { success_rate: null }, 4: { success_rate: null }, 5: { success_rate: null } };
+    const at = (mean: number): AdaptiveProfile => {
+      const skills = emptySkills();
+      for (const d of DIMENSIONS) skills[d] = { ...skills[d], mean };
+      return { user_id: 'operator', skills, weakest: 'night', cold_start: false };
+    };
+    expect(recommendNext(at(0.05), cal, []).difficulty).toBe(1);
+    expect(recommendNext(at(0.5), cal, []).difficulty).toBe(3);
+    expect(recommendNext(at(0.95), cal, []).difficulty).toBe(5);
   });
 });

@@ -26,14 +26,23 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     if (!journal.current) return null;
     return { ...journal.current, tick: simRef.current.state.tick, actions: [...simRef.current.actions] };
   }, []);
-  const persist = useCallback(() => {
+  const lastPersist = useRef(0);
+  const persist = useCallback((force = false) => {
+    // The game loop calls this every tick (~4 Hz, faster at high pace): throttle
+    // routine writes to ~1 Hz. Explicit saves (finish, checkpoint, actions,
+    // tab-hide) pass force=true and always write through.
+    if (!force) {
+      const now = Date.now();
+      if (now - lastPersist.current < 1000) return;
+      lastPersist.current = now;
+    }
     const current = snapshot(); if (!current) return;
     try { localStorage.setItem(journalKey(current.user_id), JSON.stringify(current)); }
     catch { setMessage('Browser storage is full. Keep the local service running so checkpoints can be saved.'); }
   }, [snapshot]);
   const checkpoint = useCallback(() => {
     const current = snapshot(); if (!current || current.finished) return;
-    persist();
+    persist(true);
     syncChain.current = syncChain.current.then(async () => {
       setSyncState('saving');
       try { await api.checkpoint(current); setSyncState('saved'); }
@@ -43,7 +52,7 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
   const finish = useCallback(async (): Promise<SessionRecord | null> => {
     if (!journal.current || completing.current) return null;
     completing.current = true; setBusy(true); setRunning(false);
-    simRef.current.finish(); journal.current.finished = true; persist(); refresh();
+    simRef.current.finish(); journal.current.finished = true; persist(true); refresh();
     const current = snapshot()!;
     await syncChain.current;
     try {
@@ -73,9 +82,10 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     return () => clearInterval(timer);
   }, [running, speed, checkpoint, persist]);
   useEffect(() => {
-    const save = () => { persist(); if (document.hidden) { setRunning(false); suspendAudio(); } };
-    document.addEventListener('visibilitychange', save); window.addEventListener('pagehide', persist);
-    return () => { document.removeEventListener('visibilitychange', save); window.removeEventListener('pagehide', persist); };
+    const save = () => { persist(true); if (document.hidden) { setRunning(false); suspendAudio(); } };
+    const hide = () => persist(true);
+    document.addEventListener('visibilitychange', save); window.addEventListener('pagehide', hide);
+    return () => { document.removeEventListener('visibilitychange', save); window.removeEventListener('pagehide', hide); };
   }, [persist]);
   const restore = useCallback((bootstrap: Bootstrap) => {
     setRunning(false); setSpeed(1);
@@ -112,7 +122,7 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     try {
       const current = await api.start(scenario, mode); journal.current = current;
       simRef.current = new Simulation(current.scenario); setSpeed(1); setRecovered(false); setSyncState('saved');
-      setMessage('Exercise started. Acknowledge each contact, then compare independent cues.'); persist(); setRunning(true); refresh(); return true;
+      setMessage('Exercise started. Acknowledge each contact, then compare independent cues.'); persist(true); setRunning(true); refresh(); return true;
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to start the exercise.'); return false; }
     finally { setBusy(false); }
   }, [finish, persist]);
@@ -126,7 +136,7 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     if (!journal.current || simRef.current.state.ended) return;
     unlockAudio();
     const result = simRef.current.dispatch({ ...input, tick: simRef.current.state.tick });
-    setMessage(result.message); persist(); refresh();
+    setMessage(result.message); persist(true); refresh();
   }, [persist]);
   return { sim: simRef.current, revision, active: !!journal.current, mode: journal.current?.mode ?? 'training' as const, running, busy, message, speed, recovered, syncState, setSpeed, setRunning, start, toggle, act, finish, restore, checkpoint };
 }

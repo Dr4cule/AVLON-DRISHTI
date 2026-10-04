@@ -62,22 +62,22 @@ export function AdaptivePanel({ onLaunch, onBrowse }: { onLaunch: (s: Scenario, 
   return <div className="adaptive-grid">
     <section className="panel"><div className="panel-header"><div className="panel-title"><BrainCircuit size={16} /><h2>Skill evidence</h2></div><span className={`tag ${data.profile.cold_start ? 'amber' : 'gray'}`}>{data.profile.cold_start ? 'COLD START' : 'ESTABLISHED'}</span></div>
       <div className="panel-content">
-        {DIMENSIONS.map(d => { const s = data.profile.skills[d]; return <div key={d} className="skill-row"><span>{DIMENSION_LABELS[d]}</span><div><i style={{ width: `${s.mean * 100}%` }} /></div><strong>{Math.round(s.mean * 100)}%</strong><small>±{Math.round(s.uncertainty * 100)}</small></div>; })}
+        {DIMENSIONS.map(d => { const s = data.profile.skills[d]; if (!s || !Number.isFinite(s.mean) || !Number.isFinite(s.uncertainty)) return null; return <div key={d} className="skill-row"><span>{DIMENSION_LABELS[d]}</span><div><i style={{ width: `${s.mean * 100}%` }} /></div><strong>{Math.round(s.mean * 100)}%</strong><small>±{Math.round(s.uncertainty * 100)}</small></div>; })}
         <p className="fine-print">Beta(a,b) per dimension, init 2/2. Success ≥70 adds tag-weight to a, else to b. Mean = a/(a+b). Uncertainty = 1/(a+b). Synthetic and provisional sessions excluded. This is a practice heuristic, not a validated readiness rating.</p>
       </div>
     </section>
     <section className="panel"><div className="panel-header"><div className="panel-title"><Check size={15} /><h2>Next challenge</h2></div><span className="tag cyan">AI TRAINING ANALYSIS</span></div>
       <div className="panel-content">
-        <p className="briefing-description">Weakest: <strong>{DIMENSION_LABELS[data.profile.weakest as Dimension]}</strong>. Target ~68% success at the edge of ability.</p>
+        <p className="briefing-description">Weakest: <strong>{DIMENSION_LABELS[data.profile.weakest as Dimension] ?? 'Unknown dimension'}</strong>. Target ~68% success at the edge of ability.</p>
         {data.profile.cold_start && onBrowse && <div className="inline-note amber"><ShieldCheck size={12} /> No completed exercises yet — estimates start at 50% for everyone. <button className="button secondary small" onClick={onBrowse}>Start your first exercise <ArrowRight size={12} /></button></div>}
-        {data.patterns !== undefined && data.patterns.length > 0 && <div className="ai-row"><span>DETECTED PATTERNS</span><ul>{data.patterns.map(p => <li key={p}>{p}</li>)}</ul></div>}
-        <div className="calibration-table">{[1, 2, 3, 4, 5].map(d => <span key={d}>L{d}: {data.calibration[d]?.success_rate === null ? '—' : `${Math.round(data.calibration[d].success_rate! * 100)}% (${data.calibration[d].attempts})`}</span>)}</div>
+        {data.patterns !== undefined && data.patterns.length > 0 && <div className="ai-row"><span>DETECTED PATTERNS</span><ul>{data.patterns.map((p, i) => <li key={`${p}-${i}`}>{p}</li>)}</ul></div>}
+        <div className="calibration-table">{[1, 2, 3, 4, 5].map(d => { const c = data.calibration[d]; return <span key={d}>L{d}: {c?.success_rate == null ? '—' : `${Math.round(c.success_rate * 100)}% (${c.attempts ?? '—'})`}</span>; })}</div>
         <button className="button primary full-width" disabled={busy} onClick={recommend}>{busy ? 'Selecting…' : 'Recommend my next exercise'}</button>
-        {rec && <div className="generated-result"><div><Check size={18} /><div><span className="eyebrow">AI RECOMMENDATION</span><h3>{rec.scenario.title}</h3></div><span className="tag">L{rec.difficulty}</span></div>{rec.rationale.map((r: string) => <p key={r}>{r}</p>)}
+        {rec && rec.scenario && <div className="generated-result"><div><Check size={18} /><div><span className="eyebrow">AI RECOMMENDATION</span><h3>{rec.scenario.title ?? 'Recommended exercise'}</h3></div><span className="tag">L{rec.difficulty}</span></div>{Array.isArray(rec.rationale) && rec.rationale.map((r: string, i: number) => <p key={`${r}-${i}`}>{r}</p>)}
           {rec.challenge && <ChallengeModifiers challenge={rec.challenge as Challenge} tactics={(rec.tactics ?? []) as Tactic[]} />}
-          {Array.isArray(rec.skillDeltas) && (rec.skillDeltas as Delta[]).length > 0 && <div className="ai-row"><span>AI LEARNING UPDATE · SINCE YOUR LAST SESSION</span><ul>{(rec.skillDeltas as Delta[]).map(d => <li key={d.dimension}>{DIMENSION_LABELS[d.dimension as Dimension]}: {Math.round(d.before * 100)}% → {Math.round(d.after * 100)}%</li>)}</ul></div>}
+          {Array.isArray(rec.skillDeltas) && (rec.skillDeltas as Delta[]).filter(d => Number.isFinite(d.before) && Number.isFinite(d.after)).length > 0 && <div className="ai-row"><span>AI LEARNING UPDATE · SINCE YOUR LAST SESSION</span><ul>{(rec.skillDeltas as Delta[]).filter(d => Number.isFinite(d.before) && Number.isFinite(d.after)).map(d => <li key={d.dimension}>{DIMENSION_LABELS[d.dimension as Dimension] ?? d.dimension}: {Math.round(d.before * 100)}% → {Math.round(d.after * 100)}%</li>)}</ul></div>}
           <span className="eyebrow">AI SCENARIO GENERATION · BASELINE-CHECKED</span>
-          <button className="button secondary full-width" onClick={() => onLaunch(rec.scenario, 'training')}>Launch L{rec.difficulty} · {rec.focus.replaceAll('_', ' ')} <ArrowRight size={14} /></button>
+          <button className="button secondary full-width" onClick={() => onLaunch(rec.scenario, 'training')}>Launch L{rec.difficulty} · {typeof rec.focus === 'string' ? rec.focus.replaceAll('_', ' ') : 'recommended focus'} <ArrowRight size={14} /></button>
           <p className="fine-print">AI recommends — you decide whether to launch. The exercise passed the same fairness gate as every other scenario.</p>
         </div>}
       </div>

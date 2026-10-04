@@ -3,7 +3,7 @@ import { replay } from '../sim-core/engine';
 import { SCRIPTED_SCENARIOS } from '../sim-core/catalog';
 import { scoreSimulation } from '../sim-core/scoring';
 import { generateScenario } from '../sim-core/generator';
-import { DIMENSIONS, ENGINE_VERSION, type SessionRecord } from '../sim-core/types';
+import { DIMENSIONS, ENGINE_VERSION, type Behavior, type SessionRecord } from '../sim-core/types';
 import {
   adversaryTactics,
   challengeFromWeakness,
@@ -91,5 +91,12 @@ describe('adversarial behavior selection', () => {
   it('rejects unknown behaviors instead of silently ignoring them', () => {
     expect(() => generateScenario({ seed: 1, difficulty: 2, behaviorBias: [] })).toThrow();
     expect(() => generateScenario({ seed: 1, difficulty: 2, behaviorBias: ['dogfight' as never] })).toThrow();
+  });
+  it('resolves every documented tactic through the generator bias pools', async () => {
+    const { BIAS_POOLS } = await import('../sim-core/generator');
+    const selectable = new Set<Behavior>([...BIAS_POOLS.swarm, ...BIAS_POOLS.recon, ...BIAS_POOLS.reconExtra]);
+    for (const dim of DIMENSIONS) {
+      for (const t of adversaryTactics(dim)) expect(selectable.has(t.behavior)).toBe(true);
+    }
   });
 });

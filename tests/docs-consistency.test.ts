@@ -11,8 +11,8 @@ import { describe, expect, it } from 'vitest';
  * NOTE: this file counts itself. Adding tests here changes the suite total,
  * so update the expected total below and every claim it checks.
  */
-const EXPECTED_TOTAL = 82;
-const EXPECTED_FILES = 11;
+const EXPECTED_TOTAL = 97;
+const EXPECTED_FILES = 12;
 
 function countTests(): { total: number; files: number } {
   const dir = 'tests';

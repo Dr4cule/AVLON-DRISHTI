@@ -86,10 +86,15 @@ export function paintOverlay(ctx: CanvasRenderingContext2D, width: number, heigh
   if (sweep) {
     const angle = phase / 8000 * Math.PI * 2;
     ctx.save(); ctx.translate(cx, cy);
-    const sector = ctx.createConicGradient(angle - 0.7, 0, 0);
-    sector.addColorStop(0, 'rgba(211,183,104,0)'); sector.addColorStop(0.10, 'rgba(211,183,104,0.04)');
-    sector.addColorStop(0.111, 'rgba(211,183,104,0.12)'); sector.addColorStop(0.112, 'rgba(211,183,104,0)'); sector.addColorStop(1, 'rgba(211,183,104,0)');
-    ctx.fillStyle = sector; ctx.beginPath(); ctx.arc(0, 0, 4000 * scale, 0, Math.PI * 2); ctx.fill();
+    // Older canvas implementations lack conic gradients: fall back to the leading line alone.
+    const gradient = typeof (ctx as CanvasRenderingContext2D & { createConicGradient?: unknown }).createConicGradient === 'function'
+      ? (ctx as CanvasRenderingContext2D & { createConicGradient: (a: number, x: number, y: number) => CanvasGradient }).createConicGradient(angle - 0.7, 0, 0)
+      : null;
+    if (gradient) {
+      gradient.addColorStop(0, 'rgba(211,183,104,0)'); gradient.addColorStop(0.10, 'rgba(211,183,104,0.04)');
+      gradient.addColorStop(0.111, 'rgba(211,183,104,0.12)'); gradient.addColorStop(0.112, 'rgba(211,183,104,0)'); gradient.addColorStop(1, 'rgba(211,183,104,0)');
+      ctx.fillStyle = gradient; ctx.beginPath(); ctx.arc(0, 0, 4000 * scale, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(angle) * 4000 * scale, Math.sin(angle) * 4000 * scale);
     ctx.strokeStyle = 'rgba(217,188,114,0.15)'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
   }
@@ -110,7 +115,7 @@ export function paintOverlay(ctx: CanvasRenderingContext2D, width: number, heigh
     ctx.save(); ctx.globalAlpha = contact.resolved ? 0.3 : contact.stale ? 0.45 : 1;
     if (contact.trail.length > 1) {
       ctx.beginPath(); contact.trail.forEach((p, i) => i === 0 ? ctx.moveTo(cx + p.x * scale, cy + p.y * scale) : ctx.lineTo(cx + p.x * scale, cy + p.y * scale));
-      ctx.strokeStyle = color; ctx.globalAlpha *= 0.4; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = contact.resolved ? 0.3 : 1;
+      ctx.strokeStyle = color; ctx.globalAlpha *= 0.4; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = contact.resolved ? 0.3 : contact.stale ? 0.45 : 1;
     }
     if (selected === contact.id) {
       const pulse = 17 + Math.sin(phase / 450) * 2;

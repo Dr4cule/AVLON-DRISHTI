@@ -27,7 +27,10 @@ export function scoreSimulation(sim: Simulation): ScoreReport {
     const classes = events.filter(e => e.type === 'TrackClassified');
     const responses = events.filter(e => e.type === 'ResponseOrdered' || e.type === 'ResponseRejected');
     const firstActive = responses.find(e => EFFECTORS[e.payload.response as ResponseKind]?.active);
-    const identity = firstActive ? classes.filter(e => e.seq < firstActive.seq).at(-1) ?? classes.at(-1) : classes.at(-1);
+    // Identity is what the trainee believed at decision time: only classifications recorded
+    // before the first active response count. A classification made after shooting must not
+    // retroactively justify the shot.
+    const identity = firstActive ? classes.filter(e => e.seq < firstActive.seq).at(-1) : classes.at(-1);
     const classification = (identity?.payload.classification ?? 'unknown') as Classification;
     const correct = classification === truth;
     const delay = ack ? Number(ack.payload.delay_s) : null;
@@ -51,7 +54,8 @@ export function scoreSimulation(sim: Simulation): ScoreReport {
     const timely = mean(orders.map(e => e.payload.timely ? 100 : 0));
     const wasted = responses.filter(e => e.type === 'ResponseRejected' && !e.payload.roe_violation).length;
     let decision = pct(appropriate * 0.5 + compliant / 3 + timely / 6 - Math.min(30, wasted * 5));
-    const harmfulAttempt = responses.some(e => EFFECTORS[e.payload.response as ResponseKind]?.active && truth !== 'hostile');
+    // Only ordered (executed) effects count: a response ROE correctly blocked never happened.
+    const harmfulAttempt = responses.some(e => e.type === 'ResponseOrdered' && EFFECTORS[e.payload.response as ResponseKind]?.active && truth !== 'hostile');
     if (harmfulAttempt) decision = Math.min(20, decision);
     const reasoning = pct(mean(responses.map(e => reasonIsAppropriate(e.payload.reason as Reason, truth, e.payload.response as ResponseKind) ? 100 : 0)));
     const resolved = events.some(e => e.type === 'ActorResolved');

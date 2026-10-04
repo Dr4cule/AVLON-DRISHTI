@@ -162,7 +162,8 @@ export class Simulation {
   eventHash(): string { return hashText(JSON.stringify(this.events)); }
 }
 
-export function replay(scenario: Scenario, actions: readonly Action[], endTick: number, finalize = true): Simulation {
+export function replay(scenario: Scenario, actions: readonly Action[], endTick: number, finalize = true, expectedVersion?: string): Simulation {
+  if (expectedVersion !== undefined && expectedVersion !== ENGINE_VERSION) throw new Error(`Replay requires engine ${expectedVersion}; this station runs ${ENGINE_VERSION}.`);
   if (!Number.isInteger(endTick) || endTick < 0 || endTick > scenario.duration_s * 4) throw new Error('Invalid replay end tick.');
   const sim = new Simulation(scenario);
   let cursor = 0;

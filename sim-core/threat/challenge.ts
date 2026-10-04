@@ -68,6 +68,7 @@ export function detectPatterns(userId: string, sessions: SessionRecord[]): strin
           session.actions.filter(a => a.tick <= tick),
           tick,
           false,
+          session.engine_version,
         );
         const track = sim.state.tracks[mistake.actor_id];
         if (!track) continue;

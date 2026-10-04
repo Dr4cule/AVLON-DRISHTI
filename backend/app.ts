@@ -47,7 +47,10 @@ export function createApp(store: Store, webRoot?: string) {
   app.get('/api/auth/me', (_req, res) => res.json(user(res)));
   app.get('/api/bootstrap', (_req, res) => res.json({ user: user(res), users: store.users(), scenarios: store.scenarios(), sessions: store.sessions(user(res)), draft: store.draft(user(res)), engine_version: ENGINE_VERSION }));
   app.get('/api/scenarios', (_req, res) => res.json(store.scenarios()));
-  app.post('/api/scenarios/generate', (req, res) => res.json(generateScenario(req.body)));
+  app.post('/api/scenarios/generate', (req, res, next) => {
+    try { res.json(generateScenario(req.body)); }
+    catch (error) { next(new HttpError(400, error instanceof Error ? error.message : 'Could not generate an exercise.')); }
+  });
   app.get('/api/sessions', (_req, res) => res.json(store.sessions(user(res))));
   app.post('/api/sessions', (req, res) => res.status(201).json(store.start(user(res), req.body?.scenario, req.body?.mode)));
   app.get('/api/sessions/:id', (req, res) => res.json(store.session(String(req.params.id), user(res))));
@@ -70,7 +73,9 @@ export function createApp(store: Store, webRoot?: string) {
   const errors: ErrorRequestHandler = (error, _req, res, _next) => {
     if (error instanceof HttpError) { res.status(error.status).json({ error: error.message }); return; }
     if (error instanceof SyntaxError) { res.status(400).json({ error: 'Invalid JSON request.' }); return; }
-    res.status(400).json({ error: error instanceof Error ? error.message : 'The request could not be completed.' });
+    // Anything else is a station fault: log the internals, send a fixed message and a 500.
+    console.error(`API fault: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
+    res.status(500).json({ error: 'The local training service hit an unexpected fault.' });
   };
   app.use(errors);
   return app;

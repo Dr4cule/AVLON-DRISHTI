@@ -3,7 +3,9 @@ import { createApp } from './app';
 import { Store } from './store';
 
 const root = resolve(process.env.DRISHTI_ROOT ?? process.cwd());
-const store = new Store(resolve(root, process.env.DRISHTI_DB ?? 'data/drishti.sqlite'), process.env.DRISHTI_DEMO !== '0');
+// Explicit opt-outs only: '0', 'false', 'no', 'off', ''. Unset (or anything else) keeps demo data.
+const demoFlag = String(process.env.DRISHTI_DEMO ?? '1').toLowerCase();
+const store = new Store(resolve(root, process.env.DRISHTI_DB ?? 'data/drishti.sqlite'), !['0', 'false', 'no', 'off', ''].includes(demoFlag));
 const app = createApp(store, resolve(root, 'dist/web'));
 const port = Number(process.env.PORT ?? 3001);
 const host = process.env.HOST ?? '127.0.0.1';

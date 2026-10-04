@@ -11,14 +11,14 @@ export function UnitDashboard({ sessions }: { sessions: SessionRecord[] }) {
   const [loadError, setLoadError] = useState('');
   useEffect(() => { apiRequest('/unit/overview').then(setOverview).catch((e: unknown) => setLoadError(e instanceof Error ? e.message : 'Roster unavailable.')); }, [sessions.length]);
   const real = sessions.filter(s => !s.synthetic && (!filter || s.scenario.id.includes(filter)));
-  const avg = real.length ? Math.round(real.reduce((n, s) => n + s.report.total, 0) / real.length) : 0;
+  const avg = real.length ? Math.round(real.reduce((n, s) => n + s.report.total, 0) / real.length) : null;
   const fails: Record<string, number> = {};
   for (const s of real) for (const m of s.report.mistakes) if (m.severity === 'critical') fails[`${m.category}`] = (fails[m.category] ?? 0) + 1;
   return <>
     <div className="trend-heading"><h3>Unit readiness — observed training evidence</h3><span className="tag gray">{real.length} REAL SESSIONS</span></div>
     <div className="metrics-grid">
-      <div className="metric-card"><span>UNIT AVERAGE</span><strong>{avg}</strong><small>mean score, real sessions only</small></div>
-      <div className="metric-card"><span>SESSIONS</span><strong>{real.length}</strong><small>provisional excluded from skill model</small></div>
+      <div className="metric-card"><span>UNIT AVERAGE</span><strong>{avg ?? '—'}</strong><small>mean score, real sessions only</small></div>
+      <div className="metric-card"><span>SESSIONS</span><strong>{real.length}</strong><small>real sessions · partials included, synthetics excluded</small></div>
       <div className="metric-card"><span>TOP FAILURE</span><strong className="metric-word">{Object.entries(fails).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'}</strong><small>critical mistake cluster</small></div>
       <div className="metric-card"><span>ROSTER</span><strong>{Object.keys(overview?.byUser ?? {}).length || new Set(real.map(s => s.user_id)).size}</strong><small>trainees with evidence</small></div>
     </div>

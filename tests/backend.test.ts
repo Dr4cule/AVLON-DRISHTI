@@ -21,6 +21,16 @@ describe('local API and immutable SQLite records', () => {
       expect(scoreSimulation(replay(example.scenario, example.actions, example.end_tick))).toEqual(example.report);
     }
   });
+  it('excludes labeled synthetic examples from readiness totals', async () => {
+    const store = new Store(':memory:', true); stores.push(store);
+    const app = createApp(store);
+    const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ id: 'instructor', password: 'drishti-demo' }).expect(200);
+    const overview = await agent.get('/api/unit/overview').expect(200);
+    expect(overview.body.total).toBe(0);
+    expect(overview.body.synthetic).toBe(24);
+    expect(Object.keys(overview.body.byUser)).toHaveLength(0);
+  });
   it('recomputes the score, saves immutable events, and is idempotent on completion', async () => {
     const { app, store } = setup(); const agent = request.agent(app);
     await agent.post('/api/auth/login').send({ id: 'operator', password: 'drishti-demo' }).expect(200);
@@ -56,7 +66,7 @@ describe('local API and immutable SQLite records', () => {
     await a.post('/api/auth/login').send({ id: 'operator', password: 'wrong' }).expect(401);
     await a.post('/api/auth/login').send({ id: 'operator', password: 'drishti-demo' });
     const { body: run } = await a.post('/api/sessions').send({ scenario: SCRIPTED_SCENARIOS[0], mode: 'training' });
-    await b.post('/api/auth/login').send({ id: 'demo-01', password: 'drishti-demo' });
+    await b.post('/api/auth/login').send({ id: 'instructor', password: 'drishti-demo' });
     await b.post(`/api/sessions/${run.id}/finish`).send({ tick: 0, actions: [] }).expect(403);
     await a.post('/api/scenarios/generate').set('Origin', 'https://example.com').send({ seed: 12, difficulty: 2 }).expect(403);
   });
@@ -160,5 +170,37 @@ describe('local API and immutable SQLite records', () => {
     expect(library.body.some((s: { id: string }) => s.id === 'instructor-custom')).toBe(true);
     const unfair = { ...custom, id: 'unfair', actors: [] };
     await agent.post('/api/instructor/scenarios').send({ scenario: unfair }).expect(400);
+  });
+  it('rejects instructor overwrites of built-in scenarios', async () => {
+    const { app } = setup(); const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ id: 'instructor', password: 'drishti-demo' });
+    const clobber = { ...SCRIPTED_SCENARIOS[0], title: 'Tampered title' };
+    await agent.post('/api/instructor/scenarios').send({ scenario: clobber }).expect(409);
+    const library = await agent.get('/api/scenarios').expect(200);
+    expect(library.body.find((s: { id: string }) => s.id === clobber.id).title).not.toBe('Tampered title');
+  });
+  it('returns 401 — never throws — for unknown accounts and malformed hashes', async () => {
+    const { store } = setup();
+    try { store.login('nobody', 'whatever'); expect.unreachable(); }
+    catch (e) { expect((e as { status: number }).status).toBe(401); }
+    store.db.prepare("UPDATE users SET password_hash='broken' WHERE id='operator'").run();
+    try { store.login('operator', 'drishti-demo'); expect.unreachable(); }
+    catch (e) { expect((e as { status: number }).status).toBe(401); }
+  });
+  it('rejects refinish with different decisions but repeats identical ones', async () => {
+    const { app } = setup(); const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ id: 'operator', password: 'drishti-demo' });
+    const { body: run } = await agent.post('/api/sessions').send({ scenario: SCRIPTED_SCENARIOS[0], mode: 'training' }).expect(201);
+    const tick = run.scenario.duration_s * 4;
+    const first = await agent.post(`/api/sessions/${run.id}/finish`).send({ tick, actions: [] }).expect(200);
+    const same = await agent.post(`/api/sessions/${run.id}/finish`).send({ tick, actions: [] }).expect(200);
+    expect(same.body).toEqual(first.body);
+    const sim = replay(run.scenario, [], 40, false);
+    sim.dispatch({ tick: 40, actor_id: 'C1', type: 'acknowledge' });
+    await agent.post(`/api/sessions/${run.id}/finish`).send({ tick, actions: sim.actions }).expect(409);
+  });
+  it('seeds demo users only when demos are included', () => {
+    const { store } = setup();
+    expect(store.users().some(u => u.id === 'demo-01')).toBe(false);
   });
 });

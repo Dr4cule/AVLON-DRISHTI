@@ -56,8 +56,8 @@ export function calibrateDifficulty(sessions: SessionRecord[]): Record<number, {
 /** Pick difficulty targeting 60-75% success for the weakest skill. Simple, deterministic. */
 export function recommendNext(profile: AdaptiveProfile, calibration: Record<number, { success_rate: number | null }>, recentFingerprints: string[] = []): Recommendation & { recent_fingerprints: string[] } {
   const skill = profile.skills[profile.weakest].mean;
-  // Map skill 0..1 to difficulty: low skill -> easier, high skill -> harder. Clamp 1..5.
-  let difficulty = Math.round(1 + (1 - skill) * 2 + skill * 3);
+  // Map skill 0..1 to difficulty 1..5: low skill -> easier, high skill -> harder. Clamp 1..5.
+  let difficulty = Math.round(1 + skill * 4);
   // Prefer calibration bucket closest to 0.675 success if we have data.
   let best = difficulty; let bestDist = Infinity;
   for (let d = 1; d <= 5; d++) {

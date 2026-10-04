@@ -49,3 +49,7 @@ Softmax plus five documented interaction features was benchmarked on the identic
 ## 012 - Scenario-level validation split with a dedicated calibration split
 
 The first training run split individual snapshots 80/20, which let one trajectory's snapshots straddle train and validation. Splits are now grouped by scenario ID (70/10/20 train/calibration/test) via deterministic round-robin, and the trainer aborts if any scenario appears in two splits. Temperature is fitted on calibration only and evaluated on test only; the UI reports MODEL CONFIDENCE with its ECE documented, never raw softmax probabilities dressed as calibrated truth.
+
+## 013 - Assessment integrity without server-side simulation
+
+Scenario truth (actor allegiance/kind) necessarily reaches the trainee machine: the browser runs the same deterministic simulation locally for the live view and recovery, the UI bundles the scripted library as a fallback, and drafts carry full scenarios for resume. Stripping truth from API payloads alone would be theater — DevTools and the JS bundle would still contain it — while breaking the offline local sim. The integrity model is therefore: (1) the rendered trainee view never shows allegiance/kind (verified by test — tracks carry operator classifications only); (2) scores are recomputed server-side from the append-only event log and client scores are never trusted; (3) assessment runs are supervised use on a local station. Server-hidden simulation would require stepping every tick through the API and is explicitly out of scope for the offline design.

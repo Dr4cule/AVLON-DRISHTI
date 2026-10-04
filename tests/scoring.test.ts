@@ -54,6 +54,31 @@ describe('decision-tree scoring', () => {
     sim.finish();
     expect(scoreSimulation(sim).metrics.classification).toBe(80);
   });
+  it('does not punish a correctly blocked out-of-range attempt as a harmful shot', () => {
+    const one: Scenario = { ...base, actors: [base.actors[1]] };
+    const sim = replay(one, [], 80, false);
+    sim.dispatch({ tick: 80, actor_id: 'C2', type: 'acknowledge' });
+    sim.dispatch({ tick: 80, actor_id: 'C2', type: 'classify', classification: 'hostile', drone_type: 'quadcopter' });
+    // C2 sits near 1883 m: beyond net-capture reach (1500 m), so ROE passes and range blocks it.
+    const res = sim.dispatch({ tick: 80, actor_id: 'C2', type: 'respond', response: 'net_capture', reason: 'protect_asset' });
+    expect(res.accepted).toBe(false);
+    sim.finish();
+    const report = scoreSimulation(sim);
+    // A shot that never happened must not trigger the harmful-attempt cap (20).
+    expect(report.metrics.decision).toBeGreaterThan(20);
+  });
+  it('ignores classifications recorded after the first active response attempt', () => {
+    const one: Scenario = { ...base, actors: [base.actors[1]] };
+    const sim = replay(one, [], 80, false);
+    // Jam attempt with no classification: ROE blocks it before any identity exists.
+    const res = sim.dispatch({ tick: 80, actor_id: 'C2', type: 'respond', response: 'electronic_jam', reason: 'protect_asset' });
+    expect(res.accepted).toBe(false);
+    sim.dispatch({ tick: 80, actor_id: 'C2', type: 'classify', classification: 'hostile', drone_type: 'quadcopter' });
+    sim.finish();
+    const report = scoreSimulation(sim);
+    // Post-attempt classification must not retroactively justify the attempt: still unknown.
+    expect(report.confusion_matrix[2][3]).toBe(1);
+  });
   it('is unaffected by mutations to the final world projection', () => {
     const sim = replay(base, [], 80);
     const before = scoreSimulation(sim);

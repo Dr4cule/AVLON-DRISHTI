@@ -1,5 +1,8 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { fitTemperature, heuristicPredict, majorityBaseline, splitRows, stressSubsets, type LinearModel, type Row } from '../sim-core/threat/train';
 import { Simulation, replay } from '../sim-core/engine';
@@ -223,19 +226,25 @@ describe('threat softmax model', () => {
 });
 
 describe('threat training pipeline', () => {
-  it('retrains deterministically from seed (weights identical across runs)', () => {
-    // NOTE: file bytes are compared, not getWeights() — the bundled weights are
-    // statically imported, so in-process reads cannot observe file rewrites.
-    const committed = readFileSync('sim-core/threat/weights.json', 'utf8');
-    execSync('npx tsx sim-core/threat/train.ts --scenarios 40 --epochs 20', { stdio: 'pipe' });
-    const small = readFileSync('sim-core/threat/weights.json', 'utf8');
-    expect(small).not.toBe(committed);
-    // Same small config twice → identical bytes on disk.
-    execSync('npx tsx sim-core/threat/train.ts --scenarios 40 --epochs 20', { stdio: 'pipe' });
-    expect(readFileSync('sim-core/threat/weights.json', 'utf8')).toBe(small);
-    // Restore the committed weights with the committed config → identical bytes.
-    execSync('npx tsx sim-core/threat/train.ts', { stdio: 'pipe' });
-    expect(readFileSync('sim-core/threat/weights.json', 'utf8')).toBe(committed);
+  it('retrains deterministically from seed without touching committed artifacts', () => {
+    // Training checks run into isolated output dirs: committed weights, metrics,
+    // and report must be byte-identical before and after, even on failure.
+    const sha = (p: string) => createHash('sha256').update(readFileSync(p)).digest('hex');
+    const before = ['sim-core/threat/weights.json', 'docs/AI_METRICS.json', 'docs/AI_THREAT_REPORT.md'].map(sha);
+    const out = mkdtempSync(join(tmpdir(), 'drishti-train-'));
+    try {
+      for (const sub of ['sim-core/threat', 'docs']) mkdirSync(join(out, sub), { recursive: true });
+      const run = () => execSync(`npx tsx sim-core/threat/train.ts --scenarios 40 --epochs 20 --out "${out}"`, { stdio: 'pipe' });
+      run();
+      const small = readFileSync(join(out, 'sim-core/threat/weights.json'), 'utf8');
+      run();
+      expect(readFileSync(join(out, 'sim-core/threat/weights.json'), 'utf8')).toBe(small);
+      // The isolated small config must differ from production (proves it actually trained).
+      expect(small).not.toBe(readFileSync('sim-core/threat/weights.json', 'utf8'));
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+    expect(['sim-core/threat/weights.json', 'docs/AI_METRICS.json', 'docs/AI_THREAT_REPORT.md'].map(sha)).toEqual(before);
     setWeightsForTests(null);
   }, 240000);
 });

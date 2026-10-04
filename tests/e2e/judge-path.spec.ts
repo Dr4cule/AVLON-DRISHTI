@@ -1,22 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Full judge path in a real browser against an isolated DB (data/e2e-test.sqlite):
- * launch -> start exercise -> acknowledge/classify/respond -> end & debrief ->
- * verified replay -> adaptive recommendation.
+ * Full judge path in a real browser against a unique isolated DB per run
+ * (see playwright.config.ts): launch -> start exercise ->
+ * acknowledge/classify/respond -> end & debrief -> verified replay ->
+ * adaptive recommendation.
  */
 test('judge path: play, decide, debrief verified replay, adaptive next step', async ({ page }) => {
   await page.goto('/');
   // Auto operator login; station must report local readiness.
   await expect(page.getByText('OFFLINE READY')).toBeVisible({ timeout: 60000 });
 
-  // A stale draft from an interrupted run would show a recovery banner with a
-  // second Resume button — finish it first so the run below always starts clean.
-  if (await page.getByText('Your exercise has been recovered.').isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: 'End & debrief' }).click();
-    await expect(page.getByText('Every decision tells a story')).toBeVisible({ timeout: 60000 });
-    await page.getByRole('button', { name: 'Mission control' }).click();
-  }
+  // The isolated per-run database starts empty: no recovery banner may appear.
+  await expect(page.getByText('Your exercise has been recovered.')).toHaveCount(0);
 
   // Start a fresh exercise (default first-light scenario).
   await page.getByRole('button', { name: 'Start exercise', exact: true }).click();
@@ -30,7 +26,7 @@ test('judge path: play, decide, debrief verified replay, adaptive next step', as
 
   // Keyboard shortcuts: Acknowledge, then classify hostile.
   await page.keyboard.press('a');
-  await expect(page.getByText('acknowledged', { exact: false }).first()).toBeVisible({ timeout: 15000 }).catch(() => {});
+  await expect(page.getByText('acknowledged', { exact: false }).first()).toBeVisible({ timeout: 15000 });
   await page.keyboard.press('1');
 
   // The advisory panel must render for the selected track (never scored, never blocking).
@@ -38,12 +34,12 @@ test('judge path: play, decide, debrief verified replay, adaptive next step', as
   await expect(page.getByText('MODEL CONFIDENCE')).toBeVisible({ timeout: 15000 });
 
   // Record the default observe response with its reason.
-  await page.getByRole('button', { name: 'Record response' }).click();
+  await page.getByRole('button', { name: 'Issue Observe now' }).click();
 
   // Deliberate ROE mistake: kinetic intercept is prohibited in this exercise.
   // Guarantees a critical, reconstructable mistake for the AAR analysis below.
   await page.getByRole('button', { name: 'Intercept', exact: true }).click();
-  await page.getByRole('button', { name: 'Record response' }).click();
+  await page.getByRole('button', { name: 'Issue Intercept now' }).click();
 
   // End the exercise -> auto-navigates to the after-action review.
   await page.getByRole('button', { name: 'End & debrief' }).click();

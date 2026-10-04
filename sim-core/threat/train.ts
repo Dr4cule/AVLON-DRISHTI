@@ -10,7 +10,11 @@
  * this run and can be regenerated bit-identically with the same seed.
  * Committed artifacts: this script, its config, weights.json, and the report.
  *
- * Usage: npx tsx sim-core/threat/train.ts [--scenarios 220] [--seed 482913] [--epochs 400]
+ * Usage: npx tsx sim-core/threat/train.ts [--scenarios 220] [--seed 482913] [--epochs 400] [--out <dir>]
+ *
+ * `--out` redirects all three artifacts (weights, metrics, report) under <dir>
+ * mirroring the repo layout (`sim-core/threat/`, `docs/`); tests use it so
+ * training checks never touch the committed production files.
  */
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -36,6 +40,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SEED = Number(process.argv.find((a, i) => process.argv[i - 1] === '--seed') ?? 482913);
 const N_GEN = Number(process.argv.find((a, i) => process.argv[i - 1] === '--scenarios') ?? 220);
 const EPOCHS = Number(process.argv.find((a, i) => process.argv[i - 1] === '--epochs') ?? 400);
+const OUT = process.argv.find((a, i) => process.argv[i - 1] === '--out') ?? ROOT;
 // Snapshot ages in seconds — captures each track from "ambiguous" to "established".
 const SNAPSHOT_AGES = [1, 3, 4, 6, 10, 20, 35, 60, 90, 150];
 const MAX_TICKS = 720;
@@ -412,9 +417,9 @@ function main() {
   const scenarioAcc = [...byScenario.values()].map(e => Math.round((e.correct / e.total) * 10000) / 10000);
   const scenarioSummary = groupSummary(scenarioAcc);
 
-  // --- Persist winner ---
+  // --- Persist winner (OUT defaults to the repo root; tests redirect elsewhere) ---
   const round6 = (v: number): number => Math.round(v * 1e6) / 1e6;
-  const outDir = join(ROOT, 'sim-core', 'threat');
+  const outDir = join(OUT, 'sim-core', 'threat');
   const weights = {
     version: 1,
     classes: [...THREAT_CLASSES],
@@ -483,7 +488,7 @@ function main() {
     featureVersion: FEATURE_VERSION,
     modelVersion: MODEL_VERSION,
   };
-  writeFileSync(join(ROOT, 'docs', 'AI_METRICS.json'), JSON.stringify(metricsArtifact, null, 2) + '\n');
+  writeFileSync(join(OUT, 'docs', 'AI_METRICS.json'), JSON.stringify(metricsArtifact, null, 2) + '\n');
 
   const perClassMd = winnerTotals.perClass
     .map(p => `- **${p.name}**: n=${p.samples}, precision=${p.precision}, recall=${p.recall}, F1=${p.f1}`)
@@ -578,7 +583,7 @@ ${stressMd}
 - Config: epochs ${EPOCHS}, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, class-weight cap 6, snapshot ages ${SNAPSHOT_AGES.join('/')}s
 - Feature version ${FEATURE_VERSION} · model version ${MODEL_VERSION} · git commit ${gitCommit()}
 `;
-  writeFileSync(join(ROOT, 'docs', 'AI_THREAT_REPORT.md'), report);
+  writeFileSync(join(OUT, 'docs', 'AI_THREAT_REPORT.md'), report);
   console.log(
     `scenarios=${scenarios} samples=${rows.length} test-acc=${winnerTotals.accuracy} macroF1=${winnerMacroF1} ece=${eceBefore}->${eceAfter} interactions=${useInteractions ? 'KEPT' : 'rejected'} (${(genMs / 1000).toFixed(1)}s gen)`,
   );

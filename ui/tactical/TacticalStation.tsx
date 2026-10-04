@@ -3,7 +3,7 @@ import { Activity, ArrowUpRight, Check, ChevronDown, CircleHelp, Crosshair, Eye,
 import type { Simulation } from '../../sim-core/engine';
 import type { Action, ActorKind, Classification, Reason, ResponseKind, SensorKind } from '../../sim-core/types';
 import { trackConfidence } from '../../sim-core/sensors';
-import { EFFECTORS } from '../../sim-core/roe';
+import { EFFECTORS, checkRoe } from '../../sim-core/roe';
 import { TYPE_LABELS, REASON_LABELS, RESPONSE_LABELS, SENSOR_LABELS, formatTime, humanize } from '../copy';
 import { RadarMap } from './RadarMap';
 import { SensorFeed } from './SensorFeed';
@@ -34,8 +34,14 @@ export function TacticalStation({ sim, active, running, mode, lowResource, onAct
   };
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement)?.closest('input, select, textarea, button, [role="dialog"], [role="button"]') || event.ctrlKey || event.altKey || event.metaKey) return;
-      if (event.code === 'Space') { event.preventDefault(); onToggle(); }
+      const target = (event.target as HTMLElement) ?? null;
+      if (target?.closest('input, select, textarea, [role="dialog"]') || event.ctrlKey || event.altKey || event.metaKey) return;
+      // Space on a real button triggers native activation: stay out of the way.
+      // Other documented shortcuts (A/1-4) keep working wherever focus sits.
+      if (event.code === 'Space') {
+        if (target?.closest('button, [role="button"]')) return;
+        event.preventDefault(); onToggle(); return;
+      }
       if (!active || !selected || track?.resolved) return;
       if (event.key.toLowerCase() === 'a') onAction({ type: 'acknowledge', actor_id: selected });
       const choice = ({ '1': 'hostile', '2': 'friendly', '3': 'benign', '4': 'unknown' } as const)[event.key as '1'];
@@ -47,6 +53,21 @@ export function TacticalStation({ sim, active, running, mode, lowResource, onAct
   const health = sim.scenario.assets.length ? Math.round(Object.values(sim.state.asset_health).reduce((a, b) => a + b, 0) / sim.scenario.assets.length) : 0;
   const recent = [...sim.events].reverse().find(e => ['TrackAcknowledged', 'TrackClassified', 'ResponseOrdered', 'ResponseRejected', 'SensorStatusChanged'].includes(e.type));
   const allowedToAct = active && !sim.state.ended && !!track && !track.resolved;
+  // Response eligibility board: separate the three questions a trainee must answer
+  // before issuing — do the exercise rules permit this, is the contact in reach,
+  // and is the resource ready? Mirrors the engine's own gate order (ROE → range → charges).
+  const eligibility = (() => {
+    if (!track) return null;
+    const effector = EFFECTORS[response];
+    // Evaluated against the RECORDED classification — the engine judges what was
+    // recorded, not what is merely selected. Record a classification first.
+    const rule = checkRoe(sim.scenario, track, response, sim.state.tick, track.civilian_area);
+    const distM = Math.hypot(track.x, track.y);
+    const inRange = distM <= effector.range;
+    const res = sim.state.effectors[response];
+    const ready = res.ready_at <= sim.state.tick && res.charges > 0;
+    return { rule, inRange, distM, ready, charges: res.charges };
+  })();
   // Earcons for missable, time-critical moments only. Silent in assessment
   // mode; baselined on run start so pre-existing tracks/events never chime
   // retroactively. New-track cues fire from trainee-visible tracks, never
@@ -119,7 +140,9 @@ export function TacticalStation({ sim, active, running, mode, lowResource, onAct
               <div className="step-label"><span>02</span> CHOOSE A RESPONSE</div>
               <div className="response-grid" role="group" aria-label="Response choice">{(Object.keys(EFFECTORS) as ResponseKind[]).map(r => <button key={r} aria-pressed={response === r} title={`${EFFECTORS[r].label} · ${EFFECTORS[r].active ? `${sim.state.effectors[r].charges} charges · abstract effect` : 'Non-engagement action'}`} className={response === r ? 'selected' : ''} onClick={() => setResponse(r)} disabled={!allowedToAct}>{r === 'observe' && <Eye size={11} />}{RESPONSE_LABELS[r]}{sim.state.effectors[r].ready_at > sim.state.tick && <Timer size={10} />}</button>)}</div>
               <label className="field-label" htmlFor="action-reason">REASONING</label><label className="select-wrap"><select id="action-reason" value={reason} onChange={e => setReason(e.target.value as Reason)} disabled={!allowedToAct}>{Object.entries(REASON_LABELS).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select><ChevronDown size={12} /></label>
-              <button className="button primary full-width record-response" disabled={!allowedToAct} onClick={() => onAction({ type: 'respond', actor_id: track.id, response, reason })}>Record response <ArrowUpRight size={15} /></button>
+              {eligibility && allowedToAct && <div className="eligibility-board" role="status"><span className={eligibility.rule.allowed ? 'text-green' : 'text-amber'}>{eligibility.rule.allowed ? 'RULES PASS' : 'RULES BLOCK'}</span><span>{(eligibility.distM / 1000).toFixed(1)}/{(EFFECTORS[response].range / 1000).toFixed(1)} km · {eligibility.inRange ? 'IN REACH' : 'OUT OF REACH'}</span><span>{eligibility.charges} CHARGES · {eligibility.ready ? 'READY' : 'COOLDOWN'}</span></div>}
+              {eligibility && !eligibility.rule.allowed && allowedToAct && <p className="fine-print">{eligibility.rule.detail} Issuing anyway is recorded — and scored — as a violation.</p>}
+              <button className="button primary full-width record-response" disabled={!allowedToAct} onClick={() => onAction({ type: 'respond', actor_id: track.id, response, reason })}>Issue {RESPONSE_LABELS[response]} now <ArrowUpRight size={15} /></button>
               <div className="resource-line"><span>{EFFECTORS[response].active ? `${sim.state.effectors[response].charges} CHARGES` : 'NON-ENGAGEMENT'}</span><span>{sim.state.effectors[response].ready_at > sim.state.tick ? `READY IN ${Math.ceil((sim.state.effectors[response].ready_at - sim.state.tick) / 4)}s` : 'READY'}</span></div>
             </>}
             <div className="action-feedback" role="status">{message || (active ? 'Your decisions are being recorded.' : 'Start the exercise to record your decisions.')}</div>

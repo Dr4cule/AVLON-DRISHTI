@@ -4,6 +4,7 @@ import { SCRIPTED_SCENARIOS } from '../../sim-core/catalog';
 import { scoreSimulation } from '../../sim-core/scoring';
 import { ENGINE_VERSION, type Action, type RunJournal, type Scenario, type SessionRecord, type User } from '../../sim-core/types';
 import { api, type Bootstrap } from './api';
+import { formatTime } from '../copy';
 import { suspendAudio, unlockAudio } from './sound';
 
 const journalKey = (userId: string) => `drishti.journal.v1.${userId}`;
@@ -57,8 +58,12 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     await syncChain.current;
     try {
       const record = await api.finish(current);
-      localStorage.removeItem(journalKey(current.user_id)); journal.current = null;
+      // The server commit is the durable save. Browser-journal cleanup is
+      // best-effort: it must never convert a completed save into a failure.
+      journal.current = null;
       setRecovered(false); setSyncState('saved'); setMessage('Exercise saved. Your decision evidence is ready for review.');
+      try { localStorage.removeItem(journalKey(current.user_id)); }
+      catch { /* journal already saved server-side; leave the retry path clean */ }
       callback.current(record); return record;
     } catch (error) {
       setSyncState('pending'); setMessage(`${error instanceof Error ? error.message : 'Unable to save.'} Use “Save & debrief” to retry.`);
@@ -99,7 +104,10 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
       }
       if (candidate && candidate.engine_version === ENGINE_VERSION) {
         simRef.current = replay(candidate.scenario, candidate.actions, candidate.tick, !!candidate.finished);
-        journal.current = candidate; setRecovered(true); setMessage(`Recovered ${candidate.actions.length} decisions. Resume when you are ready.`);
+        journal.current = candidate; setRecovered(true);
+        setMessage(candidate.finished
+          ? `Recovered a completed exercise (${candidate.actions.length} decisions). Use “Save & debrief” to retry the save — your decisions are intact.`
+          : `Recovered ${candidate.actions.length} decisions. Resume when you are ready.`);
       } else { journal.current = null; simRef.current = new Simulation(SCRIPTED_SCENARIOS[6]); setRecovered(false); }
     } catch {
       // Even the fallback can throw on a corrupt draft — never let recovery crash the app.
@@ -136,7 +144,7 @@ export function useTraining(onCompleted: (record: SessionRecord) => void) {
     if (!journal.current || simRef.current.state.ended) return;
     unlockAudio();
     const result = simRef.current.dispatch({ ...input, tick: simRef.current.state.tick });
-    setMessage(result.message); persist(true); refresh();
+    setMessage(`T+${formatTime(simRef.current.state.tick / 4)} — ${result.message}`); persist(true); refresh();
   }, [persist]);
   return { sim: simRef.current, revision, active: !!journal.current, mode: journal.current?.mode ?? 'training' as const, running, busy, message, speed, recovered, syncState, setSpeed, setRunning, start, toggle, act, finish, restore, checkpoint };
 }

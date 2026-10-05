@@ -5,7 +5,7 @@ Date: 2026-10-03, updated after M4–M7 build pass
 Folder: `C:\Bedrock\Work\Drone` only
 Spec: `PROJECT_SPEC.md` is authoritative
 Product: **AVLON DRISHTI — Airspace training system** — offline, adaptive drone-threat decision trainer
-Status: M1–M7 implemented. Typecheck clean. **97/97 Vitest passing (12 files).** Production build OK (`dist/web` + `dist/server.cjs`).
+Status: M1–M7 implemented. Typecheck clean. **99/99 Vitest passing (12 files).** Production build OK (`dist/web` + `dist/server.cjs`).
 
 > A visible object is not necessarily hostile. A high-confidence track is confidence in a sensor observation, not permission to respond.
 
@@ -13,7 +13,7 @@ Status: M1–M7 implemented. Typecheck clean. **97/97 Vitest passing (12 files).
 
 M1–M7 are implemented, gated in `docs/CHECKLIST.md`, and hardened (see §5 fix log). The app runs end-to-end: briefing → live imperfect sensor picture → acknowledge/classify/respond with reasons → server-validated scoring → SQLite persistence with persisted skill profiles → synchronized sensor/truth replay → trends/confusion/heatmap → scenario library + seeded generator with baseline feasibility → adaptive next exercise → instructor studio + unit dashboard. Delivered as a vendored offline bundle plus Docker.
 
-Tests now: **97/97 Vitest passing** across 12 files, plus **2/2 Playwright E2E** (API smoke + real-browser judge path). Typecheck clean.
+Tests now: **99/99 Vitest passing** across 12 files, plus **2/2 Playwright E2E** (API smoke + real-browser judge path). Typecheck clean.
 
 ## 2. How to run now
 
@@ -90,7 +90,7 @@ Data: `data/drishti.sqlite` file DB, `:memory:` in tests. No network calls at ru
 - `generator.test.ts` ×6 — 10 scripted valid+feasible, 50 generated L1-5 valid+feasible, reproducibility, fingerprint diversity, constraints/errors, constrained-degraded tagging + loadout fingerprinting
 - `scoring.test.ts` ×8 — zero provisional, baseline ≥90 with nodes, benign-as-hostile critical at tick, violation retained, partial type credit 80, blocked-shot fairness (no harmful cap), post-attempt classification ignored, snapshot-mutation immunity
 - `adaptive.test.ts` ×6 — skill init/uncertainty shrink, weakest-dimension targeting, deterministic difficulty, full-range difficulty mapping, cold-start flag, calibration buckets
-- `threat.test.ts` ×12 — feature extraction determinism, model contract, exact evidence attribution, invalid-input rejection, hostile distribution, training determinism
+- `threat.test.ts` ×14 — feature extraction determinism, model contract, exact evidence attribution, invalid-input rejection, hostile distribution, training determinism, calib-only selection bar + sealed selection
 - `analysis.test.ts` ×3 — explanation from recorded evidence, empty-report fallback, no fabrication on corrupt data
 - `challenge.test.ts` ×9 — mistake patterns, challenge-profile mapping for all dimensions, fairness preserved, adversary tactics, bias validation, bias-pool coverage for every tactic
 - `backend.test.ts` ×16 — synthetic reproducibility, recompute+immutable+idempotent, prefix/tick guards + 409 events, auth/ownership/origin, distinct retry + draft recovery, synthetic-excluded readiness totals, login 401 shapes, refinish mismatch 409, overwrite guard, demo-flag seeding, **skill persistence + persisted flag, cross-profile role gates, deterministic recommend (+challenge/tactics/deltas), skill-movement reporting, assignment lifecycle + validation, instructor library saves**

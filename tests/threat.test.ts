@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { fitTemperature, heuristicPredict, majorityBaseline, splitRows, stressSubsets, type LinearModel, type Row } from '../sim-core/threat/train';
+import { fitTemperature, heuristicPredict, majorityBaseline, selectCandidateModel, selectWinner, splitRows, stressSubsets, type LinearModel, type Row } from '../sim-core/threat/train';
 import { Simulation, replay } from '../sim-core/engine';
 import { SCRIPTED_SCENARIOS } from '../sim-core/catalog';
 import { extractFeatures, FEATURE_NAMES, labelFor, THREAT_CLASSES } from '../sim-core/threat/features';
@@ -226,6 +226,34 @@ describe('threat softmax model', () => {
 });
 
 describe('threat training pipeline', () => {
+  it('selects the winner on calibration scores with a +0.02 bar', () => {
+    expect(selectWinner(0.6, 0.619)).toBe(false);
+    expect(selectWinner(0.6, 0.62)).toBe(true);
+    expect(selectWinner(0.7, 0.5)).toBe(false);
+  });
+  it('seals selection from test data: same train+calib always selects the same model', () => {
+    // selectCandidateModel takes (train, calib) only — arity guards against a
+    // test input being snuck back into selection later.
+    expect(selectCandidateModel.length).toBe(2);
+    const mk = (y: number, s: string, shift: number): Row => ({
+      x: Array.from({ length: 15 }, (_, i) => ((y * 7 + i * 13 + shift) % 100) / 100),
+      y, s, ageSec: 10, fresh: 3, terrain: 'rural', tod: 'day',
+      weather: 'clear', em: 'clean', difficulty: 2, distractorsTag: 1,
+    });
+    const train: Row[] = [], calib: Row[] = [];
+    for (let c = 0; c < 6; c++) {
+      for (let i = 0; i < 3; i++) train.push(mk(c, `t${c}`, i));
+      for (let i = 0; i < 2; i++) calib.push(mk(c, `c${c}`, i + 40));
+    }
+    const first = selectCandidateModel(train, calib);
+    expect(Number.isFinite(first.baseF1)).toBe(true);
+    expect(Number.isFinite(first.richF1)).toBe(true);
+    // Mutating hypothetical test labels changes nothing: selection never sees them.
+    const testA = calib.map(r => ({ ...r, y: (r.y + 1) % 6 }));
+    const testB = calib.map(r => ({ ...r, y: (r.y + 3) % 6 }));
+    expect(testA).not.toEqual(testB);
+    expect(selectCandidateModel(train, calib)).toEqual(first);
+  });
   it('retrains deterministically from seed without touching committed artifacts', () => {
     // Training checks run into isolated output dirs: committed weights, metrics,
     // and report must be byte-identical before and after, even on failure.

@@ -27,7 +27,7 @@ One message per slide. Speaker notes in italics.
 - **What we did NOT build:** no LLMs, no giant models, no ONNX runtime (a WASM black box would cost us exact evidence attribution), no real weapon data — everything is fictional gameplay parameters. Say this out loud; judges punish caught AI theater, never honesty.
 - **AI metrics block (copy from `docs/AI_METRICS.json`, never from memory):** 15 features → 6 classes · 14,874 synthetic observations · 230 scenarios · scenario-level held-out validation · accuracy 70.3% · macro F1 0.62 · balanced accuracy 0.69 · ECE 0.109→0.046 · model ~2.3 KB · inference <1 ms CPU · offline.
 - **AI DOES:** interpret imperfect sensor evidence · estimate a threat hypothesis · expose uncertainty · identify training weaknesses · recommend the next exercise. **AI DOES NOT:** control scoring · override ROE · see hidden ground truth during inference · require cloud inference · require a GPU · make the final operational decision.
-- Stack (checkable names): React + TypeScript + Canvas, Node 24, SQLite (built-in), Vitest + Playwright. 97 unit tests + browser E2E green.
+- Stack (checkable names): React + TypeScript + Canvas, Node 24, SQLite (built-in), Vitest + Playwright. 99 unit tests + browser E2E green.
 - *Key line: **AI recommends. Deterministic simulation verifies. Human decides.***
 
 ## Slide 5 — Feasibility, viability, impact

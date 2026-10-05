@@ -35,8 +35,8 @@ Engine stays `1.0.0`, report schema `1.0`, yet grading behavior changed; old rep
 
 ## 2. ML integrity issue
 
-### 2.1 Final test data influences model selection — `sim-core/threat/train.ts:363–388`
-Test macro-F1 picks the model variant and test ECE decides whether calibration is kept. The reported test set is therefore not untouched. **Fix:** select architecture on validation data, fit calibration on a separate split, evaluate once on a frozen test set, regenerate report + metrics + docs claims. **Verify:** selection code never reads the test split; reruns reproduce bytes.
+### 2.1 Final test data influenced model selection — FIXED
+`sim-core/threat/train.ts` evaluated both candidates on TEST and picked the winner (plus the calibration-retention gate) from TEST ECE. Fixed: candidates train on TRAIN, `selectCandidateModel(train, calib)` seals selection on CALIB macro-F1 (+0.02 bar) with no test input by signature (arity-guarded); temperature fitted on CALIB with retention gated on CALIB improvement; the frozen winner is evaluated on TEST exactly once. Report documents the protocol including CALIB's disclosed dual role. Regression tests: selection bar boundaries, sealed-selection determinism/arity, protocol sentence in docs-consistency. Retrained: identical headline metrics (0.703 / 0.622 / ECE 0.109→0.046), interactions still rejected — weights and metrics byte-identical, report wording only.
 
 ---
 
@@ -91,3 +91,4 @@ Conflict records answer *what was reported*; sensor datasets answer *what sensor
 | 2026-10-04 | Training checks isolated via `--out` temp dirs; committed weights/metrics/report untouched | `git status` clean on all three artifacts after suite run |
 | 2026-10-04 | E2E: unique DB per run, fresh `npm run build` before serve, no stale-draft masking | 2/2 Playwright from clean-build path |
 | 2026-10-04 | Response-readiness board (ROE/range/charges split), "Issue X now" wording, timestamped receipts | Typecheck clean; E2E exercises both buttons |
+| 2026-10-04 | ML selection leak fixed: sealed calib-only selection + calib-gated calibration retention; retrained with identical metrics; suite 99/99 | Typecheck clean; full Vitest; retrain determinism; docs-consistency protocol assertion |

@@ -44,4 +44,4 @@ Verified via backend tests (assignment validation/lifecycle, instructor-scenario
 
 ### Hardening + warfare-research pass
 
-Crash-proofing (ErrorBoundary at shell + tactical station, validated studio imports, guarded restore recovery), `fiber_optic` EM-immune archetype, scenarios 09 (spotter–striker night wave) and 10 (wire-guided + civilian restraint) with real-tactic footnotes, present-mode projector toggle, empty-state CTAs, deterministic recommend-by-default, 24 synthetic demo sessions, `docs/PITCH_DECK.md` + `docs/DEPLOYMENT.md` + backup-video shot list. Suite: 97/97 Vitest, 2/2 Playwright, typecheck clean, bundle re-verified.
+Crash-proofing (ErrorBoundary at shell + tactical station, validated studio imports, guarded restore recovery), `fiber_optic` EM-immune archetype, scenarios 09 (spotter–striker night wave) and 10 (wire-guided + civilian restraint) with real-tactic footnotes, present-mode projector toggle, empty-state CTAs, deterministic recommend-by-default, 24 synthetic demo sessions, `docs/PITCH_DECK.md` + `docs/DEPLOYMENT.md` + backup-video shot list. Suite: 99/99 Vitest, 2/2 Playwright, typecheck clean, bundle re-verified.

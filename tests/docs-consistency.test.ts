@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
  * NOTE: this file counts itself. Adding tests here changes the suite total,
  * so update the expected total below and every claim it checks.
  */
-const EXPECTED_TOTAL = 97;
+const EXPECTED_TOTAL = 99;
 const EXPECTED_FILES = 12;
 
 function countTests(): { total: number; files: number } {
@@ -69,6 +69,7 @@ describe('documentation consistency', () => {
     expect(REPORT()).toContain(String(metrics.eceBefore));
     expect(REPORT()).toContain(String(metrics.eceAfter));
     expect(REPORT()).toContain('Expected Calibration Error');
+    expect(REPORT()).toContain('TEST never selects the model');
     expect(PITCH()).toContain(`ECE ${metrics.eceBefore}→${metrics.eceAfter}`);
   });
   it('rejects known-stale metric strings everywhere they could mislead', () => {

@@ -6,9 +6,10 @@ The raw dataset is never written to disk; rerunning the command reproduces these
 - Model: multinomial logistic regression (softmax), 15 features → 6 classes, pure TypeScript, no dependencies.
 - Data: 14874 labeled track snapshots from 230 headless simulations (10 scripted + 220 generated draws).
 - Split: **scenario-level** 70/10/20 using deterministic round-robin assignment over sorted scenario IDs — validation consists entirely of track snapshots from simulated scenarios that are absent from the training set. This measures **generalization to unseen simulated scenarios**, not real-world generalization.
+- Selection protocol: both candidates train on TRAIN; the winner is chosen on **CALIB macro-F1 only** (interaction terms ship on a ≥0.02 gain). The frozen winner is then evaluated on TEST exactly once — TEST never selects the model. CALIB doubles as the temperature-fitting split (disclosed, not hidden); TEST is report-only end to end.
 - Labels: ground-truth allegiance/kind, except tracks younger than 6 s or with fewer than 2 fresh sensor readings are labeled `unknown_uav` (insufficient evidence must mean "unknown").
 - Training: seeded full-batch gradient descent, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, inverse-frequency class weights (capped at 6), 400 epochs.
-- Dataset generation took 2.8 s on a laptop CPU.
+- Dataset generation took 6.1 s on a laptop CPU.
 
 ## Model comparison (identical splits, identical test set)
 
@@ -72,7 +73,7 @@ Note on the heuristic: it re-implements parts of the labeling rule itself (notab
 
 ## Confidence calibration
 
-- Expected Calibration Error on held-out test scenarios: **0.109 before** → **0.046 after** (temperature 0.742, fitted on the calibration split only).
+- Expected Calibration Error on held-out test scenarios: **0.109 before** → **0.046 after** (temperature 0.742, fitted on the calibration split only, retention gated on calibration improvement). TEST ECE is reported, never used to choose the model.
 - The UI reports this number as MODEL CONFIDENCE: the model's own probability estimate, validated to track observed accuracy within the ECE above — not a physical probability.
 
 ## Interpretation for judges
@@ -92,4 +93,4 @@ Note on the heuristic: it re-implements parts of the labeling rule itself (notab
 
 - Seed 482913 · scenarios 230 (train 161 / calib 23 / test 46) · snapshots train 10032 / calib 1869 / test 2973
 - Config: epochs 400, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, class-weight cap 6, snapshot ages 1/3/4/6/10/20/35/60/90/150s
-- Feature version 2 · model version 2 · git commit b76e80bddd9af54126b85eacf9cb6de3608c2d8b
+- Feature version 2 · model version 2 · git commit 10ddacec14b1984bb28028f76401e5fbe0c5bdee

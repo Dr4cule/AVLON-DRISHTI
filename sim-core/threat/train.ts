@@ -310,6 +310,28 @@ function eceOn(model: LinearModel, rows: Row[], temperature: number): number {
   return expectedCalibrationError(conf, correct).ece;
 }
 
+/**
+ * Architecture selection rule, exported for regression tests: the interaction
+ * model ships only on a clear win. Callers must feed it CALIBRATION-split
+ * scores — never TEST scores (see main()).
+ */
+export function selectWinner(baseMacroF1: number, richMacroF1: number): boolean {
+  return richMacroF1 >= baseMacroF1 + 0.02;
+}
+
+/**
+ * Candidate training + architecture selection in one sealed step: both models
+ * train on TRAIN, the winner is chosen on CALIB macro-F1. Takes no test rows —
+ * selection cannot read the final evaluation set by construction.
+ */
+export function selectCandidateModel(train: Row[], calib: Row[]): { useInteractions: boolean; base: LinearModel; rich: LinearModel; baseF1: number; richF1: number } {
+  const base = trainSoftmax(train);
+  const rich = trainSoftmax(train, withInteractions);
+  const baseF1 = macroAverage(confusionTotals(confusionFor(base, calib)).perClass, 'f1');
+  const richF1 = macroAverage(confusionTotals(confusionFor(rich, calib)).perClass, 'f1');
+  return { useInteractions: selectWinner(baseF1, richF1), base, rich, baseF1, richF1 };
+}
+
 export type StressName = 'NORMAL' | 'NIGHT' | 'DEGRADED SENSORS' | 'HIGH SENSOR CONFLICT' | 'HIGH AMBIGUITY';
 
 /**
@@ -356,41 +378,41 @@ function main() {
   const { train, calib, test } = splitRows(rows);
   const genMs = Date.now() - t0;
 
-  const scenarioIds = new Set(rows.map(r => r.s));
-  const trainIds = new Set(train.map(r => r.s));
-  const overlap = new Set(test.map(r => r.s).filter(s => trainIds.has(s)));
-  if (overlap.size > 0) throw new Error('Train/test scenario overlap — split is broken.');
+  const idsOf = (rs: Row[]) => new Set(rs.map(r => r.s));
+  const trainIds = idsOf(train), calibIds = idsOf(calib), testIds = idsOf(test);
+  const cross = [...testIds].filter(s => trainIds.has(s) || calibIds.has(s));
+  if (cross.length > 0) throw new Error('Split scenario overlap — split is broken.');
 
   // --- Baselines ---
   const majority = majorityBaseline(train, test);
   const heuristic = heuristicBaseline(test);
 
-  // --- Candidate models, identical splits/sets ---
-  const base = trainSoftmax(train);
-  const baseMatrix = confusionFor(base, test);
-  const baseTotals = confusionTotals(baseMatrix);
-  const baseMacroF1 = macroAverage(baseTotals.perClass, 'f1');
-  const baseBalanced = balancedAccuracy(baseTotals.perClass);
-
-  const rich = trainSoftmax(train, withInteractions);
-  const richMatrix = confusionFor(rich, test);
-  const richTotals = confusionTotals(richMatrix);
-  const richMacroF1 = macroAverage(richTotals.perClass, 'f1');
-
-  // --- Winner selection first: simplest sufficient model ---
-  const useInteractions = richMacroF1 >= baseMacroF1 + 0.02;
+  // --- Candidate models, trained on TRAIN; winner selected on CALIB only ---
+  // The TEST split must never choose the model.
+  const { useInteractions, base, rich } = selectCandidateModel(train, calib);
   const winner = useInteractions ? rich : base;
-  const winnerTotals = useInteractions ? richTotals : baseTotals;
-  const winnerMacroF1 = useInteractions ? richMacroF1 : baseMacroF1;
 
-  // --- Calibration AFTER winner selection, fit on CALIB only, evaluated on TEST only ---
+  // --- Freeze winner: everything below EVALUATES, nothing selects ---
+  const winnerTotals = confusionTotals(confusionFor(winner, test));
+  const winnerMacroF1 = macroAverage(winnerTotals.perClass, 'f1');
+  // Candidate-vs-candidate TEST numbers below are report-only context for the
+  // comparison table — selection already happened on CALIB above.
+  const baseTestTotals = confusionTotals(confusionFor(base, test));
+  const baseTestMacroF1 = macroAverage(baseTestTotals.perClass, 'f1');
+  const richTestTotals = confusionTotals(confusionFor(rich, test));
+  const richTestMacroF1 = macroAverage(richTestTotals.perClass, 'f1');
+
+  // --- Calibration AFTER winner selection, fit on CALIB only ---
   // Temperature belongs to the shipped model; fitting it on a model we discard
-  // would silently miscalibrate whatever we actually ship.
-  const eceBefore = eceOn(winner, test, 1);
+  // would silently miscalibrate whatever we actually ship. Retention is gated on
+  // CALIB improvement so TEST stays report-only end to end.
+  const calibEceBefore = eceOn(winner, calib, 1);
   const temperature = fitTemperature(winner, calib);
-  const eceAfter = eceOn(winner, test, temperature);
-  const calibrated = eceAfter < eceBefore - 0.005;
+  const calibEceAfter = eceOn(winner, calib, temperature);
+  const calibrated = calibEceAfter < calibEceBefore - 0.005;
   const finalTemperature = calibrated ? temperature : 1;
+  const eceBefore = eceOn(winner, test, 1);
+  const eceAfter = eceOn(winner, test, finalTemperature);
 
   // --- Slice evaluations on the TEST split ---
   const established = test.filter(r => r.ageSec >= 6 && r.fresh >= 2);
@@ -481,10 +503,10 @@ function main() {
     majorityMacroF1: round4(majority.macroF1),
     heuristicAccuracy: round4(heuristic.accuracy),
     heuristicMacroF1: round4(heuristic.macroF1),
-    softmaxAccuracy: round4(baseTotals.accuracy),
-    softmaxMacroF1: round4(baseMacroF1),
-    interactionAccuracy: round4(richTotals.accuracy),
-    interactionMacroF1: round4(richMacroF1),
+    softmaxAccuracy: round4(baseTestTotals.accuracy),
+    softmaxMacroF1: round4(baseTestMacroF1),
+    interactionAccuracy: round4(richTestTotals.accuracy),
+    interactionMacroF1: round4(richTestMacroF1),
     featureVersion: FEATURE_VERSION,
     modelVersion: MODEL_VERSION,
   };
@@ -502,8 +524,8 @@ function main() {
     '| --- | ---: | ---: | --- |',
     `| Majority | ${fmtPct(majority.accuracy)} | ${majority.macroF1} | tiny |`,
     `| Heuristic | ${fmtPct(heuristic.accuracy)} | ${heuristic.macroF1} | tiny |`,
-    `| Softmax | ${fmtPct(baseTotals.accuracy)} | ${baseMacroF1} | ~${Math.round(JSON.stringify({ W: base.W, b: base.b }).length / 1024 * 10) / 10} KB |`,
-    `| Softmax + interactions | ${fmtPct(richTotals.accuracy)} | ${richMacroF1} | ~${Math.round(JSON.stringify({ W: rich.W, b: rich.b }).length / 1024 * 10) / 10} KB |`,
+    `| Softmax | ${fmtPct(baseTestTotals.accuracy)} | ${baseTestMacroF1} | ~${Math.round(JSON.stringify({ W: base.W, b: base.b }).length / 1024 * 10) / 10} KB |`,
+    `| Softmax + interactions | ${fmtPct(richTestTotals.accuracy)} | ${richTestMacroF1} | ~${Math.round(JSON.stringify({ W: rich.W, b: rich.b }).length / 1024 * 10) / 10} KB |`,
   ].join('\n');
   const stressMd = stress.map(s => `- **${s.name}**: ${fmtPct(s.accuracy)} (n=${s.n})`).join('\n');
   const pairMd =
@@ -518,6 +540,7 @@ The raw dataset is never written to disk; rerunning the command reproduces these
 - Model: multinomial logistic regression (softmax), ${FEATURE_NAMES.length} features → ${THREAT_CLASSES.length} classes${useInteractions ? ' + selected interaction terms' : ''}, pure TypeScript, no dependencies.
 - Data: ${rows.length} labeled track snapshots from ${scenarios} headless simulations (10 scripted + ${N_GEN} generated draws).
 - Split: **scenario-level** 70/10/20 using deterministic round-robin assignment over sorted scenario IDs — validation consists entirely of track snapshots from simulated scenarios that are absent from the training set. This measures **generalization to unseen simulated scenarios**, not real-world generalization.
+- Selection protocol: both candidates train on TRAIN; the winner is chosen on **CALIB macro-F1 only** (interaction terms ship on a ≥0.02 gain). The frozen winner is then evaluated on TEST exactly once — TEST never selects the model. CALIB doubles as the temperature-fitting split (disclosed, not hidden); TEST is report-only end to end.
 - Labels: ground-truth allegiance/kind, except tracks younger than 6 s or with fewer than 2 fresh sensor readings are labeled \`unknown_uav\` (insufficient evidence must mean "unknown").
 - Training: seeded full-batch gradient descent, lr 1.0 with 1/(1+epoch/100) decay, L2 1e-4, inverse-frequency class weights (capped at 6), ${EPOCHS} epochs.
 - Dataset generation took ${(genMs / 1000).toFixed(1)} s on a laptop CPU.
@@ -561,7 +584,7 @@ ${stressMd}
 
 ## Confidence calibration
 
-- Expected Calibration Error on held-out test scenarios: **${eceBefore} before** → **${eceAfter} after** (temperature ${finalTemperature}${calibrated ? ', fitted on the calibration split only' : '; temperature scaling rejected — improvement below threshold, raw softmax kept'}).
+- Expected Calibration Error on held-out test scenarios: **${eceBefore} before** → **${eceAfter} after** (temperature ${finalTemperature}${calibrated ? ', fitted on the calibration split only, retention gated on calibration improvement' : '; temperature scaling rejected on calibration — improvement below threshold, raw softmax kept'}). TEST ECE is reported, never used to choose the model.
 - The UI reports this number as MODEL CONFIDENCE: the model's own probability estimate, validated to track observed accuracy within the ECE above — not a physical probability.
 
 ## Interpretation for judges

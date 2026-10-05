@@ -70,7 +70,7 @@
 - Backend: Node.js 24 LTS (engines `>=24.0.0 <25`; bundle vendors v24.13.0) + Express 5 + built-in `node:sqlite` (WAL, FK, append-only event trigger, scrypt logins).
 - Shared core: `sim-core/` pure TypeScript, zero UI/IO deps; runs identically in browser, server, and tests.
 - Validation: JSON Schema (`schemas/`) validated on import, generation, studio save, server start (Ajv + semantic checks).
-- Tests: Vitest 3 (97/97 across 12 files) + Playwright (2/2: API smoke + real-Chromium judge path on isolated DB); `tsc --noEmit` clean.
+- Tests: Vitest 3 (99/99 across 12 files) + Playwright (2/2: API smoke + real-Chromium judge path on isolated DB); `tsc --noEmit` clean.
 - Delivery: single-folder offline bundle (`packaging/bundle.mjs` stages `release/AVLON-DRISHTI` with vendored Node, bundled server `dist/server.cjs`, `dist/web`, scenarios, schemas, docs, launch scripts) + Docker Compose.
 - Dependency note: deliberate deviation from spec's Python/FastAPI default (recorded as decision 002) to run the exact same core in browser/server/tests with one runtime.
 
@@ -115,7 +115,7 @@
 ### 5.6 Verification facts
 
 - `npm run typecheck`: clean.
-- `npm test`: 97/97 Vitest (12 files: core, sensors-roe, generator, scoring, adaptive, threat, analysis, challenge, backend, metrics, docs-consistency, ui-guards).
+- `npm test`: 99/99 Vitest (12 files: core, sensors-roe, generator, scoring, adaptive, threat, analysis, challenge, backend, metrics, docs-consistency, ui-guards).
 - `npm run test:e2e`: 2/2 Playwright (API smoke; real-Chromium judge path: start → ack/classify/respond → debrief → REPLAY VERIFIED → adaptive recommendation, isolated DB).
 - `npm run train:threat`: deterministic regeneration of weights + report + metrics (seconds).
 - Bundle: staged + booted with API + web healthy on a test port; health reports engine 1.0.0, sqlite storage, `external_services: 0`.
@@ -189,7 +189,7 @@
 - Health: `/api/health` returns engine version 1.0.0, sqlite storage, `external_services: 0`.
 - Logins (local only; password `drishti-demo` for all): `operator` (trainee, Alpha unit); `instructor` (studio + readiness; override via `DRISHTI_INSTRUCTOR_PASSWORD` on shared stations); `demo-01` … `demo-04` (labeled synthetic example profiles).
 - Env knobs: `PORT`, `HOST`, `DRISHTI_ROOT`, `DRISHTI_DB`, `DRISHTI_DEMO=1/0`, `DRISHTI_INSTRUCTOR_PASSWORD`.
-- Verify: `npm run typecheck` (clean); `npm test` (97/97 Vitest); `npm run test:e2e` (2/2 Playwright); `npm run train:threat` (deterministic regeneration).
+- Verify: `npm run typecheck` (clean); `npm test` (99/99 Vitest); `npm run test:e2e` (2/2 Playwright); `npm run train:threat` (deterministic regeneration).
 - Troubleshoot: port in use → set PORT; DB locked → stop duplicate server; blank UI → run `npm run build` first.
 
 ## Appendix E. Limitations and exact honesty lines (state on stage)
